@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d2f45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="統計滑卡">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>社會統計滑卡</title>
+<style>
+/* One card on calculation paper; answer, flip, then swipe right (right) or left (wrong). No web fonts: works offline. */
+:root {
+  --paper: #f3f6f4; --grid: #d9e4de; --card: #ffffff; --ink: #1d2f45; --muted: #5e6f7d;
+  --line: #c9d6d0; --accent: #2f6db0; --right: #2e7d4f; --wrong: #b8402f; --tag: #e7eef6;
+  --font-display: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --font-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --paper: #121a20; --grid: #1c2730; --card: #1a242d; --ink: #e4ebf1; --muted: #9aaab7;
+  --line: #2c3a45; --accent: #7fb0e6; --right: #6cc392; --wrong: #ec8a78; --tag: #22303c; color-scheme: dark } }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.7;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.wrap { max-width: 480px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 32px; display: grid; gap: 14px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-size: 1.45rem; margin: 0; letter-spacing: .02em; }
+.count { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px;
+  font: inherit; font-size: .85rem; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.stage { position: relative; min-height: 360px; touch-action: pan-y; }
+.card { position: absolute; inset: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / .08); padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; transition: transform .25s ease, opacity .25s ease; user-select: none; }
+.meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); }
+.meta span { background: var(--tag); border-radius: 6px; padding: 1px 8px; }
+.q { font-size: 1.05rem; font-weight: 500; }
+blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.a { border-top: 1px dashed var(--line); padding-top: 12px; }
+.a .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.hint { font-size: .85rem; color: var(--muted); margin: auto 0 0; }
+.stamp { position: absolute; top: 18px; font-family: var(--font-display); font-size: 1.3rem; padding: 2px 10px;
+  border: 2px solid; border-radius: 8px; opacity: 0; pointer-events: none; }
+.stamp.right { right: 18px; color: var(--right); transform: rotate(-8deg); }
+.stamp.wrong { left: 18px; color: var(--wrong); transform: rotate(8deg); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button.big { font: inherit; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); cursor: pointer; }
+button.big.sure { border-color: var(--accent); color: var(--accent); }
+button.big.right { border-color: var(--right); color: var(--right); }
+button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
+button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.note { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: .92rem; }
+details.box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; }
+details.box summary { cursor: pointer; font-weight: 700; }
+.stack { display: grid; gap: 10px; margin-top: 10px; }
+label { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+textarea, select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+textarea { min-height: 70px; resize: vertical; }
+.status { font-size: .85rem; color: var(--muted); min-height: 1.2em; }
+.small { font-size: .85rem; color: var(--muted); margin: 0; }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>社會統計滑卡</h1>
+    <span class="count" id="count">載入中</span>
+  </header>
+  <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
+
+  <div class="stage" id="stage" aria-live="polite">
+    <article class="card" id="card"><div class="q">正在載入題目……</div></article>
+  </div>
+  <div class="actions" id="actions"></div>
+
+  <div class="note">先在心裡或紙上答完，再選「有把握」或「不確定」翻面。翻面後往右滑＝答對、往左滑＝答錯（也可以按按鈕或鍵盤左右鍵）。答錯的卡會在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。</div>
+
+  <details class="box">
+    <summary>自己做一張卡</summary>
+    <form class="stack" id="addForm">
+      <label for="addChapter">章節<select id="addChapter"></select></label>
+      <label for="addQ">問題（用自己的話寫）<textarea id="addQ" required></textarea></label>
+      <label for="addA">答案（附一句「因為……」）<textarea id="addA" required></textarea></label>
+      <button class="big" type="submit">加入</button>
+      <div class="status" id="addStatus"></div>
+    </form>
+  </details>
+
+  <details class="box">
+    <summary>成績備份與搬移</summary>
+    <div class="stack">
+      <p class="small">成績只存在這支手機的這個 App 裡，不會上傳。每週按一次「匯出成績」，把檔案存到雲端硬碟或傳給自己，再放到電腦上分析；換手機時用「匯入成績」還原。</p>
+      <button class="big sure" id="export" type="button">匯出成績</button>
+      <button class="big" id="copy" type="button">複製成績文字</button>
+      <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
+      <div class="status" id="backupStatus"></div>
+    </div>
+  </details>
+
+  <p class="small" id="offline"></p>
+</div>
+
+<script>
+const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];  // Leitner box -> days until due after a right answer
+const DAY = 86400000;
+const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "自我檢測", mine: "自製" };
+const KEY = "swipe-cards-v1";
+
+let deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
+let chapter = "all", retried = new Set();
+const $ = id => document.getElementById(id);
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.progress) state = { progress: s.progress, mine: s.mine || [] }; }
+  catch (e) { /* storage blocked: practise without saving */ }
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+  catch (e) { $("backupStatus").textContent = "這個瀏覽器不讓 App 存資料，成績不會保留。"; return false; }
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function md(text) {
+  // **bold**, "> " quote lines, ``` code fences and line breaks; everything escaped first.
+  let html = "", quote = false, code = false;
+  for (const raw of esc(text).split("\n")) {
+    if (raw.startsWith("```")) { html += code ? "</pre>" : "<pre>"; code = !code; continue; }
+    if (code) { html += raw + "\n"; continue; }
+    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const q = line.startsWith("&gt;");
+    if (q && !quote) { html += "<blockquote>"; quote = true; }
+    if (!q && quote) { html += "</blockquote>"; quote = false; }
+    html += (q ? line.replace(/^&gt; ?/, "") : line) + "<br>";
+  }
+  return html + (quote ? "</blockquote>" : "") + (code ? "</pre>" : "");
+}
+
+function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
+function isDue(c, now) { const p = state.progress[c.id]; return !p || p.due <= now; }
+function inChapter(c) { return chapter === "all" || c.chapter === chapter; }
+
+function buildQueue() {
+  const now = Date.now();
+  queue = allCards().filter(c => inChapter(c) && isDue(c, now));
+  for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+  retried = new Set();
+}
+
+function renderChips() {
+  const cards = allCards(), now = Date.now();
+  const chapters = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
+  const btn = (key, text) => {
+    const n = cards.filter(c => (key === "all" || c.chapter === key) && isDue(c, now)).length;
+    return `<button class="chip" data-ch="${esc(key)}" aria-pressed="${chapter === key}">${esc(text)} · ${n}</button>`;
+  };
+  $("chips").innerHTML = btn("all", "全部") + chapters.map(([k, l]) => btn(k, l)).join("");
+  $("addChapter").innerHTML = chapters.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
+}
+
+function setActions(kind) {
+  $("actions").innerHTML =
+    kind === "front" ? `<button class="big" id="unsure" type="button">翻面：不確定</button><button class="big sure" id="sure" type="button">翻面：有把握</button>` :
+    kind === "back" ? `<button class="big wrong" id="bad" type="button">← 答錯</button><button class="big right" id="good" type="button">答對 →</button>` :
+    kind === "done" ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "";
+}
+
+function render() {
+  const card = $("card");
+  $("count").textContent = `剩 ${queue.length + (current ? 1 : 0)} 張`;
+  card.style.transform = ""; card.style.opacity = "";
+  if (!current) {
+    card.innerHTML = deck.length
+      ? `<div class="meta"><span>今天完成</span></div><div class="q">這一輪到期的卡片都做完了。</div><p class="hint">明天再回來。分開幾天複習，比一次做很多張記得久。</p>`
+      : `<div class="meta"><span>沒有題目</span></div><div class="q">題目還沒下載。請連上網路後重新開啟。</div>`;
+    setActions(deck.length ? "done" : "");
+    return;
+  }
+  const c = current, p = state.progress[c.id];
+  card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div>
+    <div class="meta"><span>${esc(c.label || c.chapter)}</span><span>${KIND[c.kind] || esc(c.kind)}</span><span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
+    <div class="q">${md(c.q)}</div>
+    ${flipped ? `<div class="a"><div class="label">答案</div>${md(c.a)}</div>` : ""}
+    <p class="hint">${flipped ? "往右滑＝答對，往左滑＝答錯" : "先答完再翻面"}</p>`;
+  setActions(flipped ? "back" : "front");
+}
+
+function next() { current = queue.shift() || null; flipped = false; render(); }
+function flip(isSure) { sure = isSure ? 1 : 0; flipped = true; render(); }
+
+function grade(right) {
+  const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
+  const box = right ? Math.min(p.box + 1, INTERVAL_DAYS.length - 1) : 0;
+  state.progress[c.id] = { chapter: c.chapter, kind: c.kind, box, due: now + INTERVAL_DAYS[box] * DAY,
+                           log: [...p.log, [now, right ? 1 : 0, sure]] };
+  save();
+  if (!right && !retried.has(c.id)) { retried.add(c.id); queue.push(c); }
+  const card = $("card");
+  card.style.transform = `translateX(${right ? 420 : -420}px) rotate(${right ? 14 : -14}deg)`;
+  card.style.opacity = "0";
+  current = null;
+  setTimeout(() => { next(); renderChips(); }, 220);
+}
+
+let startX = null;
+$("stage").addEventListener("pointerdown", e => { if (current && flipped) { startX = e.clientX; $("card").style.transition = "none"; } });
+window.addEventListener("pointermove", e => {
+  if (startX === null) return;
+  const dx = e.clientX - startX, card = $("card");
+  card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
+  card.querySelector(".stamp.right").style.opacity = Math.max(0, Math.min(1, dx / 90));
+  card.querySelector(".stamp.wrong").style.opacity = Math.max(0, Math.min(1, -dx / 90));
+});
+function endDrag(e) {
+  if (startX === null) return;
+  const dx = e.clientX - startX; startX = null;
+  $("card").style.transition = "";
+  if (Math.abs(dx) > 90 && current) grade(dx > 0); else render();
+}
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
+
+$("actions").addEventListener("click", e => {
+  const id = e.target.id;
+  if (id === "sure") flip(true);
+  if (id === "unsure") flip(false);
+  if (id === "good" && current) grade(true);
+  if (id === "bad" && current) grade(false);
+  if (id === "again") { queue = allCards().filter(inChapter).sort(() => Math.random() - .5); retried = new Set(); next(); }
+});
+window.addEventListener("keydown", e => {
+  if (!current || e.target.closest("form, details")) return;
+  if (!flipped && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); flip(e.key === "ArrowUp"); }
+  else if (flipped && e.key === "ArrowRight") grade(true);
+  else if (flipped && e.key === "ArrowLeft") grade(false);
+});
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  chapter = b.dataset.ch; renderChips(); buildQueue(); next();
+});
+
+$("addForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const q = $("addQ").value.trim(), a = $("addA").value.trim(), ch = $("addChapter").value;
+  if (!q || !a) return;
+  const label = (deck.find(c => c.chapter === ch) || {}).label || ch;
+  const card = { id: "mine-" + Date.now().toString(36), chapter: ch, label, q, a, created: Date.now() };
+  state.mine.push(card);
+  if (save()) { $("addQ").value = ""; $("addA").value = ""; $("addStatus").textContent = "已加入，這一輪最後會出現。"; }
+  queue.push({ ...card, kind: "mine" }); renderChips();
+});
+
+function exportText() {
+  return JSON.stringify({ exported: new Date().toISOString(), app: "social-statistics-swipe-cards",
+                          progress: state.progress, mine: state.mine }, null, 1);
+}
+$("export").addEventListener("click", () => {
+  const blob = new Blob([exportText()], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `滑卡成績_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  $("backupStatus").textContent = "已產生檔案。若沒有出現下載，改用「複製成績文字」。";
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(exportText()); $("backupStatus").textContent = "已複製，可貼到記事本存成 .json 檔。"; }
+  catch (e) { $("backupStatus").textContent = "這個瀏覽器不允許複製，請改用「匯出成績」。"; }
+});
+$("importFile").addEventListener("change", async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || typeof data.progress !== "object") throw new Error("format");
+    // Merge: keep, for each card, whichever side has the longer history.
+    for (const [id, p] of Object.entries(data.progress)) {
+      const mine = state.progress[id];
+      if (!mine || (p.log || []).length > mine.log.length) state.progress[id] = p;
+    }
+    const have = new Set(state.mine.map(m => m.id));
+    for (const m of data.mine || []) if (!have.has(m.id)) state.mine.push(m);
+    save(); renderChips(); buildQueue(); next();
+    $("backupStatus").textContent = `已匯入 ${Object.keys(data.progress).length} 張卡的成績。`;
+  } catch (err) { $("backupStatus").textContent = "這個檔案不是滑卡匯出的成績，請重新選擇。"; }
+  e.target.value = "";
+});
+
+function showOnline() { $("offline").textContent = navigator.onLine ? "" : "目前離線：可以照常練習，成績存在手機裡。"; }
+window.addEventListener("online", showOnline);
+window.addEventListener("offline", showOnline);
+
+async function start() {
+  load(); showOnline();
+  try {
+    const res = await fetch("cards.json", { cache: "no-cache" });
+    deck = (await res.json()).cards || [];
+  } catch (e) { deck = []; }
+  renderChips(); buildQueue(); next();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+}
+start();
+</script>
+</body>
+</html>

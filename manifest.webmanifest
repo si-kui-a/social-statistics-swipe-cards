@@ -1,0 +1,17 @@
+{
+  "name": "社會統計滑卡",
+  "short_name": "統計滑卡",
+  "description": "社會統計入門概念的練習卡：先作答再翻面，左右滑記對錯，依間隔重複排程，可離線使用。",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f4",
+  "theme_color": "#1d2f45",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}
