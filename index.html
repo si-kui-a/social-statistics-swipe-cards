@@ -70,6 +70,8 @@ pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono
   border: 2px solid; border-radius: 8px; opacity: 0; pointer-events: none; }
 .stamp.right { right: 18px; color: var(--right); transform: rotate(-8deg); }
 .stamp.wrong { left: 18px; color: var(--wrong); transform: rotate(8deg); }
+.undo { display: block; margin: 8px auto 0; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line, #ccc); background: transparent; color: inherit; font: inherit; }
+.undo[hidden] { display: none; }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 button.big { font: inherit; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
   background: var(--card); color: var(--ink); cursor: pointer; }
@@ -121,6 +123,7 @@ textarea { min-height: 70px; resize: vertical; }
     <article class="card" id="card"><div class="q">正在載入題目……</div></article>
   </div>
   <div class="actions" id="actions"></div>
+  <button class="undo" id="undo" type="button" hidden>↶ 反悔上一張（重新作答）</button>
 
   <details class="box">
     <summary>怎麼用</summary>
@@ -171,6 +174,8 @@ let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], curre
 // phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
 let scope = "all", chapter = "all", group = "all", retried = new Set();
+// One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
+let undo = null, advanceTimer = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
@@ -250,7 +255,7 @@ function buildQueue(ignoreDue) {
   // An unfinished answer comes back first, even when this round would not have drawn its card.
   const d = loadDraft(), held = d && allCards().filter(inChapter).find(c => c.id === d.id);
   if (held) queue = [held, ...queue.filter(c => c.id !== held.id)];
-  retried = new Set();
+  retried = new Set(); undo = null;
   const scores = Engine.recentScores(state.progress, 30);
   const acc = scores.length ? `・近期得分 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
   $("round").textContent = `複習 ${r.seen.length}・新卡 ${r.fresh.length}${acc}`;
@@ -281,6 +286,7 @@ function renderChips() {
 
 function setActions() {
   const f = current ? format(current) : "";
+  $("undo").hidden = !undo;
   $("actions").innerHTML =
     !current ? (deck.length ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "") :
     phase === "front" ? `<button class="big" id="unsure" type="button">${f === "flip" ? "翻面" : "送出"}：不確定</button><button class="big sure" id="sure" type="button">${f === "flip" ? "翻面" : "送出"}：有把握</button>` :
@@ -368,6 +374,8 @@ function submit(isSure) {
 // (auto-graded formats) or moves on (flip cards, graded by the swipe itself).
 function record(score) {
   const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
+  undo = { state: JSON.stringify(state), queue: queue.slice(), retried: [...retried], card: c, typed, picked,
+           ticks: ticks.slice(), phase: format(c) === "flip" ? "back" : "front" };
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
   const entry = [now, right ? 1 : 0, sure];
   if (score !== 0 && score !== 1) entry.push(score);
@@ -382,12 +390,27 @@ function record(score) {
   phase = "result"; render();
 }
 
+// Puts box, ability, log and retry queue back as they were before the last answer was saved,
+// and shows that card again to answer anew.
+function undoLast() {
+  if (!undo) return;
+  if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+  const u = undo; undo = null;
+  const old = JSON.parse(u.state);
+  Object.keys(state).forEach(k => delete state[k]); Object.assign(state, old);
+  queue = u.queue; retried = new Set(u.retried);
+  current = u.card; phase = u.phase; typed = u.typed; picked = u.picked; ticks = u.ticks;
+  save(); saveDraft();
+  const card = $("card"); card.style.transform = ""; card.style.opacity = "";
+  renderChips(); render();
+}
+
 function advance(right) {
   const card = $("card");
   card.style.transform = `translateX(${right ? 420 : -420}px) rotate(${right ? 14 : -14}deg)`;
   card.style.opacity = "0";
   current = null;
-  setTimeout(() => { next(); renderChips(); }, 220);
+  advanceTimer = setTimeout(() => { advanceTimer = null; next(); renderChips(); }, 220);
 }
 
 let startX = null;
@@ -432,8 +455,11 @@ $("actions").addEventListener("click", e => {
   if (id === "next" && current) advance(Engine.passed(current, lastScore));
   if (id === "again") { buildQueue(true); next(); }
 });
+$("undo").addEventListener("click", undoLast);
 window.addEventListener("keydown", e => {
-  if (!current || e.target.closest("form, details, textarea, input")) return;
+  if (e.target.closest("form, details, textarea, input")) return;
+  if (e.key === "z" || e.key === "Z") return undoLast();
+  if (!current) return;
   const f = format(current);
   if (phase === "front" && f === "mc" && /^[1-5a-eA-E]$/.test(e.key)) {
     const k = /\d/.test(e.key) ? "ABCDE"[Number(e.key) - 1] : e.key.toUpperCase();
