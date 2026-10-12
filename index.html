@@ -37,21 +37,32 @@ body {
 header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 h1 { font-family: var(--font-display); font-size: 1.45rem; margin: 0; letter-spacing: .02em; }
 .count { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+/* One swipeable row each: wrapped, the long chapter names filled a phone screen and pushed the card below it. */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
 .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px;
-  font: inherit; font-size: .85rem; cursor: pointer; }
+  font: inherit; font-size: .85rem; cursor: pointer; flex: none; white-space: nowrap; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
 .decks { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .deck { font: inherit; font-weight: 700; padding: 8px; border: 0; background: var(--card); color: var(--muted); cursor: pointer; }
 .deck[aria-pressed="true"] { background: var(--accent); color: var(--card); }
-.stage { position: relative; min-height: 360px; touch-action: pan-y; }
+/* Taller than the old fixed 360px so a long question still leaves room; the input sits in .work,
+   pinned below the scrolling .body, so it never drops out of view. 390px is the header, deck and
+   filter rows plus the buttons below, so on a phone the whole card and its buttons fit one screen. */
+.stage { position: relative; height: clamp(360px, calc(100dvh - 390px), 620px); touch-action: pan-y; }
 .card { position: absolute; inset: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-  box-shadow: 0 10px 28px rgb(0 0 0 / .08); padding: 20px; display: flex; flex-direction: column; gap: 12px;
-  overflow-y: auto; transition: transform .25s ease, opacity .25s ease; user-select: none; }
-.meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); }
-.meta span { background: var(--tag); border-radius: 6px; padding: 1px 8px; }
+  box-shadow: 0 10px 28px rgb(0 0 0 / .08); display: flex; flex-direction: column;
+  overflow: hidden; transition: transform .25s ease, opacity .25s ease; user-select: none; }
+.body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.work { flex: none; display: grid; gap: 4px; padding: 10px 20px 14px; border-top: 1px solid var(--line); background: var(--card); }
+.work label { color: var(--muted); }
+.meta { display: flex; gap: 6px; font-size: .75rem; color: var(--muted); white-space: nowrap; }
+.meta span { background: var(--tag); border-radius: 6px; padding: 1px 8px; flex: none; }
+.meta span:first-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .q { font-size: 1.05rem; font-weight: 500; }
 blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+/* Wide tables (e.g. regression output) scroll on their own instead of the whole card. */
+pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; }
 .a { border-top: 1px dashed var(--line); padding-top: 12px; }
 .a .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
 .hint { font-size: .85rem; color: var(--muted); margin: auto 0 0; }
@@ -66,7 +77,6 @@ button.big.sure { border-color: var(--accent); color: var(--accent); }
 button.big.right { border-color: var(--right); color: var(--right); }
 button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
 button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.note { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: .92rem; }
 details.box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; }
 details.box summary { cursor: pointer; font-weight: 700; }
 .stack { display: grid; gap: 10px; margin-top: 10px; }
@@ -83,7 +93,8 @@ textarea { min-height: 70px; resize: vertical; }
 .choice.bad { border-color: var(--wrong); color: var(--wrong); text-decoration: line-through; }
 .card input[type="text"], .card textarea { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line);
   border-radius: 8px; padding: 8px; width: 100%; }
-.card textarea { min-height: 120px; resize: vertical; user-select: text; }
+.card textarea { height: clamp(5em, 18dvh, 10em); resize: none; user-select: text; }
+.card textarea.optional { height: 4.5em; }  /* flip cards: a jotted answer, not an essay */
 .points { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .points label { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); font-size: .95rem; }
 .points input { margin-top: .35em; }
@@ -111,7 +122,10 @@ textarea { min-height: 70px; resize: vertical; }
   </div>
   <div class="actions" id="actions"></div>
 
-  <div class="note">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡則先在心裡答完再翻面，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。</div>
+  <details class="box">
+    <summary>怎麼用</summary>
+    <p class="small">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡可先在作答框寫下答案（選填）再翻面對照，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。左右滑動卡片也可評分。</p>
+  </details>
 
   <details class="box">
     <summary>自己做一張卡</summary>
@@ -142,8 +156,8 @@ textarea { min-height: 70px; resize: vertical; }
 <script src="engine.js"></script>
 <script>
 const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", exam: "國考選擇題", mine: "自製" };
-const HINT = { mc: "點選一個答案，再選有把握或不確定送出", num: "輸入數字（可用小數、分數或百分比），再送出",
-               essay: "寫下答案（條列要點即可），再送出", flip: "先答完再翻面" };
+// Only what the buttons and labels do not already say; the line also carries "answer first" prompts.
+const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip: "" };
 // Each deck keeps its own cards, progress, ability estimates and exports, so the subjects never mix.
 // The statistics deck keeps the storage key it had before decks existed. newStart is the number of
 // new cards per round before the app has learned anything about the learner (engine.js adjusts it).
@@ -238,8 +252,8 @@ function buildQueue(ignoreDue) {
   if (held) queue = [held, ...queue.filter(c => c.id !== held.id)];
   retried = new Set();
   const scores = Engine.recentScores(state.progress, 30);
-  const acc = scores.length ? `，近 ${scores.length} 題得分率 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
-  $("round").textContent = `本輪：複習 ${r.seen.length} 張、新卡 ${r.fresh.length} 張（每輪新卡上限 ${newCap()}${acc}）`;
+  const acc = scores.length ? `・近期得分 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
+  $("round").textContent = `複習 ${r.seen.length}・新卡 ${r.fresh.length}${acc}`;
 }
 
 function chipRow(el, items, active, attr) {
@@ -284,16 +298,21 @@ function answerBody(c) {
     });
     return `<div class="choices">${items.join("")}</div>`;
   }
-  if (f === "num") return `<input type="text" id="numIn" inputmode="decimal" autocomplete="off" aria-label="你的答案" value="${esc(typed)}" ${done ? "disabled" : ""}>`;
-  if (f === "essay") {
-    let html = `<textarea id="essayIn" aria-label="你的答案" ${phase === "front" ? "" : "readonly"}>${esc(typed)}</textarea>`;
-    if (phase !== "front") {
-      html += `<div class="a"><div class="label">評分要點（勾選你有寫到的）</div><ul class="points">${(c.points || []).map((p, i) =>
-        `<li><label><input type="checkbox" data-i="${i}" ${ticks[i] ? "checked" : ""} ${done ? "disabled" : ""}>${md(p.t)}</label></li>`).join("")}</ul></div>`;
-    }
-    return html;
+  if (f === "essay" && phase !== "front") {
+    return `<div class="a"><div class="label">評分要點（勾選你有寫到的）</div><ul class="points">${(c.points || []).map((p, i) =>
+      `<li><label><input type="checkbox" data-i="${i}" ${ticks[i] ? "checked" : ""} ${done ? "disabled" : ""}>${md(p.t)}</label></li>`).join("")}</ul></div>`;
   }
   return "";
+}
+
+// Where the learner writes, pinned under the scrolling question so a long question or table never
+// pushes it out of view. Only while answering; afterwards the text moves up next to the answer.
+function workArea(c) {
+  const f = format(c);
+  if (phase !== "front" || f === "mc") return "";
+  if (f === "num") return `<div class="work"><label for="numIn">你的答案</label><input type="text" id="numIn" inputmode="decimal" autocomplete="off" value="${esc(typed)}"></div>`;
+  const label = f === "essay" ? "你的答案（條列要點即可）" : "你的答案（選填，翻面後對照）";
+  return `<div class="work"><label for="essayIn">${label}</label><textarea id="essayIn"${f === "flip" ? ' class="optional"' : ""}>${esc(typed)}</textarea></div>`;
 }
 
 function render() {
@@ -315,13 +334,16 @@ function render() {
     const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${c.num.value}）` : "";
     result = `<p class="result ${ok ? "ok" : "bad"}">${ok ? "答對" : "答錯"}${detail}</p>`;
   }
-  card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div>
-    <div class="meta"><span>${esc(c.label || c.chapter)}</span>${c.type || KIND[c.kind] ? `<span>${esc(c.type || KIND[c.kind])}</span>` : ""}${c.level ? `<span>${Engine.LEVEL_NAME[c.level]}</span>` : ""}<span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
+  const mine = phase !== "front" && typed.trim() && f !== "mc"
+    ? `<div class="a"><div class="label">你的答案</div>${md(typed)}</div>` : "";
+  card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div><div class="body">
+    <div class="meta"><span>${esc(c.label || c.chapter)}</span>${c.type || KIND[c.kind] ? `<span>${esc(c.type || KIND[c.kind])}</span>` : ""}<span>${c.level ? Engine.LEVEL_NAME[c.level] + "・" : ""}${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
     <div class="q">${md(c.q)}</div>
+    ${mine}
     ${answerBody(c)}
     ${result}
     ${showAnswer && c.a ? `<div class="a"><div class="label">${f === "essay" ? "參考答案" : "答案與說明"}</div>${md(c.a)}</div>` : ""}
-    <p class="hint">${phase === "back" ? "往右滑＝答對，往左滑＝答錯" : phase === "result" ? "左右滑或按「下一張」繼續" : phase === "rubric" ? "依實際寫到的內容勾選，再按完成評分" : HINT[f]}</p>`;
+    <p class="hint">${phase === "front" ? HINT[f] : ""}</p></div>${workArea(c)}`;
   setActions();
 }
 
@@ -351,7 +373,8 @@ function record(score) {
   if (score !== 0 && score !== 1) entry.push(score);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   Engine.updateAbility(state.model, c, score);
-  if (format(c) === "essay") state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
+  // Flip cards keep what was written too, when anything was (no rubric, so ticks stays empty).
+  if (format(c) === "essay" || (format(c) === "flip" && typed.trim())) state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
   save(); clearDraft();
   if (!right && !retried.has(c.id)) { retried.add(c.id); queue.push(c); }
   lastScore = score;
