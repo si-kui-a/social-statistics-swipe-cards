@@ -12,6 +12,8 @@
 //   volume    the number of new cards per round starts at the deck's newStart and moves by NEW_STEP
 //             after every ADJUST_EVERY attempts: up when recent accuracy is high and few reviews are
 //             due, down when accuracy is low or reviews pile up.
+//   confidence an unsure right answer keeps its box (min 1 day); a confident wrong answer comes back
+//             RETRY_SOON cards later in the same round instead of at the end (retryAt).
 (function (root) {
   "use strict";
   const LEVEL_B = { 1: -1, 2: 0, 3: 1.2 };
@@ -21,6 +23,7 @@
   const DAY = 86400000;
   const NEW_MIN = 5, NEW_MAX = 40, NEW_STEP = 5, ADJUST_EVERY = 10, RECENT = 30;
   const HIGH = 0.85, LOW = 0.65, FEW_DUE = 20, MANY_DUE = 60;
+  const RETRY_SOON = 3;
   const NEGATION = /(不是|並非|沒有|不|非|無|未)$/;
 
   function level(card) { return LEVEL_B[card.level] === undefined ? 2 : card.level; }
@@ -86,10 +89,18 @@
   }
   function passed(card, score) { return score >= (card.format === "essay" ? (card.pass || 0.6) : 1); }
 
-  function schedule(entry, right, now) {
-    const box = right ? Math.min((entry ? entry.box : 0) + 1, INTERVAL_DAYS.length - 1) : 0;
+  // Confidence moves the schedule, never the score: an unsure right answer is still right (the
+  // ability estimate stays honest), but the card is not promoted, so it returns the next day instead
+  // of after a longer gap. sure defaults to 1 so callers without it keep the old behaviour.
+  function schedule(entry, right, now, sure = 1) {
+    const prev = entry ? entry.box : 0;
+    const box = !right ? 0 : sure ? Math.min(prev + 1, INTERVAL_DAYS.length - 1) : Math.max(1, prev);
     return { box, due: now + INTERVAL_DAYS[box] * DAY };
   }
+
+  // Where a wrongly answered card goes back into the round's queue: a confident wrong answer, the
+  // misconception most worth fixing, after RETRY_SOON cards; an unsure one at the end.
+  function retryAt(queueLength, sure) { return sure ? Math.min(RETRY_SOON, queueLength) : queueLength; }
 
   // Seen cards that are due (or all seen ones), then unseen cards closest to TARGET success, up to cap.
   function buildRound(cards, state, opts) {
@@ -149,6 +160,6 @@
   }
 
   const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, buildRound, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

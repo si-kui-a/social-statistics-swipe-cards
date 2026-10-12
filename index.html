@@ -124,7 +124,7 @@ textarea { min-height: 70px; resize: vertical; }
 
   <details class="box">
     <summary>怎麼用</summary>
-    <p class="small">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡可先在作答框寫下答案（選填）再翻面對照，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。左右滑動卡片也可評分。</p>
+    <p class="small">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡可先在作答框寫下答案（選填）再翻面對照，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次（選「有把握」卻答錯的，隔 3 張就再出現）；答對的卡依 1、3、7、14、30 天的間隔再出現，選「不確定」的答對不升級、隔天再複習。信心只影響複習時間，不影響得分。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。左右滑動卡片也可評分。</p>
   </details>
 
   <details class="box">
@@ -368,7 +368,7 @@ function submit(isSure) {
 // (auto-graded formats) or moves on (flip cards, graded by the swipe itself).
 function record(score) {
   const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
-  const right = Engine.passed(c, score), s = Engine.schedule(p, right, now);
+  const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
   const entry = [now, right ? 1 : 0, sure];
   if (score !== 0 && score !== 1) entry.push(score);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
@@ -376,7 +376,7 @@ function record(score) {
   // Flip cards keep what was written too, when anything was (no rubric, so ticks stays empty).
   if (format(c) === "essay" || (format(c) === "flip" && typed.trim())) state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
   save(); clearDraft();
-  if (!right && !retried.has(c.id)) { retried.add(c.id); queue.push(c); }
+  if (!right && !retried.has(c.id)) { retried.add(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
   lastScore = score;
   if (format(c) === "flip") return advance(right);
   phase = "result"; render();
