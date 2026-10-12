@@ -52,6 +52,16 @@ ok("many due reviews hold new cards back", E.adjustVolume({}, log(12, 1), 80, 15
 ok("never below the minimum", E.adjustVolume({ newPerRound: 5 }, log(12, 0), 5, 15).newPerRound === 5);
 ok("essay partial scores count", E.recentScores({ c: { log: [[1, 0, 0, 0.5]] } }, 5)[0] === 0.5);
 
+// guessing and tolerance
+const mc4 = { format: "mc", level: 2, choices: [["A"], ["B"], ["C"], ["D"]] };
+ok("mc expected success has a 1/4 floor", Math.abs(E.expected(-10, mc4) - 0.25) < 1e-3);
+ok("non-mc has no floor", E.expected(-10, { format: "flip", level: 2 }) < 0.01);
+const mA = {}, mB = {};
+E.updateAbility(mA, mc4, 1); E.updateAbility(mB, { format: "flip", level: 2 }, 1);
+ok("a right mc answer counts less than a right recall", mA.theta.undefined < mB.theta.undefined);
+ok("small values get a tight default tolerance", E.grade({ format: "num", num: { value: 0.003 } }, "0.008") === 0);
+ok("rounded small values still pass", E.grade({ format: "num", num: { value: 0.0456 } }, "0.046") === 1);
+
 // import validation: whole file accepted or refused, never half-read
 const good = { schemaVersion: 2, progress: { a: { box: 1, due: 5, log: [[1, 1, 0], [2, 0, 1, 0.5]] } }, mine: [], essays: { a: [] }, model: { theta: { 3: 0.2 } } };
 ok("valid export passes", E.validateExport(good).length === 0);
