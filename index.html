@@ -84,6 +84,7 @@ textarea { min-height: 70px; resize: vertical; }
     <span class="count" id="count">載入中</span>
   </header>
   <div class="decks" id="decks" role="group" aria-label="選擇題庫"></div>
+  <div class="chips" id="groups" role="group" aria-label="選擇大類" hidden></div>
   <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
 
   <div class="stage" id="stage" aria-live="polite">
@@ -132,7 +133,7 @@ const DECKS = {
 const DECK_KEY = "swipe-cards-deck";
 
 let deckId = "stats", deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
-let chapter = "all", retried = new Set();
+let chapter = "all", group = "all", retried = new Set();
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
@@ -164,7 +165,9 @@ function md(text) {
 
 function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
 function isDue(c, now) { const p = state.progress[c.id]; return !p || p.due <= now; }
-function inChapter(c) { return chapter === "all" || c.chapter === chapter; }
+// A deck whose cards carry a group (研究法: 量化, 質性, 通論) gets a second row of chips above its topics.
+function inGroup(c) { return group === "all" || c.group === group; }
+function inChapter(c) { return inGroup(c) && (chapter === "all" || c.chapter === chapter); }
 
 function shuffle(list) {
   for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
@@ -186,13 +189,19 @@ function buildQueue(ignoreDue) {
 
 function renderChips() {
   const cards = allCards();
-  const chapters = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
-  const btn = (key, text) => {
-    const n = roundCards(cards.filter(c => key === "all" || c.chapter === key), false).length;
-    return `<button class="chip" data-ch="${esc(key)}" aria-pressed="${chapter === key}">${esc(text)} · ${n}</button>`;
-  };
-  $("chips").innerHTML = btn("all", "全部") + chapters.map(([k, l]) => btn(k, l)).join("");
-  $("addChapter").innerHTML = chapters.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
+  const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
+  const groups = [...new Map([...cards].sort((a, b) => a.chapter < b.chapter ? -1 : 1)
+                               .filter(c => c.group).map(c => [c.group, 1])).keys()];
+  const count = pick => roundCards(cards.filter(pick), false).length;
+  $("groups").hidden = !groups.length;
+  $("groups").innerHTML = ["all", ...groups].map(g =>
+    `<button class="chip" data-g="${esc(g)}" aria-pressed="${group === g}">${g === "all" ? "全部大類" : esc(g)} · ${count(c => g === "all" || c.group === g)}</button>`).join("");
+  const inG = [...new Map(cards.filter(inGroup).map(c => [c.chapter, c.label])).entries()].sort();
+  const short = l => group === "all" ? l : l.split("｜").pop();
+  const btn = (key, text) =>
+    `<button class="chip" data-ch="${esc(key)}" aria-pressed="${chapter === key}">${esc(text)} · ${count(c => inGroup(c) && (key === "all" || c.chapter === key))}</button>`;
+  $("chips").innerHTML = btn("all", group === "all" ? "全部" : `全部${group}`) + inG.map(([k, l]) => btn(k, short(l))).join("");
+  $("addChapter").innerHTML = all.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
 }
 
 function setActions(kind) {
@@ -275,13 +284,18 @@ $("chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;
   chapter = b.dataset.ch; renderChips(); buildQueue(); next();
 });
+$("groups").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  group = b.dataset.g; chapter = "all"; renderChips(); buildQueue(); next();
+});
 
 $("addForm").addEventListener("submit", e => {
   e.preventDefault();
   const q = $("addQ").value.trim(), a = $("addA").value.trim(), ch = $("addChapter").value;
   if (!q || !a) return;
-  const label = (deck.find(c => c.chapter === ch) || {}).label || ch;
-  const card = { id: "mine-" + Date.now().toString(36), chapter: ch, label, q, a, created: Date.now() };
+  const from = deck.find(c => c.chapter === ch) || {};
+  const card = { id: "mine-" + Date.now().toString(36), chapter: ch, label: from.label || ch, q, a, created: Date.now() };
+  if (from.group) card.group = from.group;
   state.mine.push(card);
   if (save()) { $("addQ").value = ""; $("addA").value = ""; $("addStatus").textContent = "已加入，這一輪最後會出現。"; }
   queue.push({ ...card, kind: "mine" }); renderChips();
@@ -341,7 +355,7 @@ function renderDecks() {
 async function openDeck(id) {
   deckId = DECKS[id] ? id : "stats";
   try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
-  chapter = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
+  chapter = "all"; group = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
   renderDecks(); load();
   try {
     const res = await fetch(D().file, { cache: "no-cache" });
