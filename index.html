@@ -310,7 +310,7 @@ function answerBody(c) {
 function workArea(c) {
   const f = format(c);
   if (phase !== "front" || f === "mc") return "";
-  if (f === "num") return `<div class="work"><label for="numIn">你的答案</label><input type="text" id="numIn" inputmode="decimal" autocomplete="off" value="${esc(typed)}"></div>`;
+  if (f === "num") return `<div class="work"><label for="numIn">你的答案${c.num && c.num.unit ? `（${esc(c.num.unit)}）` : ""}</label><input type="text" id="numIn" inputmode="decimal" autocomplete="off" value="${esc(typed)}"></div>`;
   const label = f === "essay" ? "你的答案（條列要點即可）" : "你的答案（選填，翻面後對照）";
   return `<div class="work"><label for="essayIn">${label}</label><textarea id="essayIn"${f === "flip" ? ' class="optional"' : ""}>${esc(typed)}</textarea></div>`;
 }
@@ -331,7 +331,7 @@ function render() {
   let result = "";
   if (phase === "result") {
     const ok = Engine.passed(c, lastScore);
-    const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${c.num.value}）` : "";
+    const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${c.num.value}${c.num.unit || ""}）` : "";
     result = `<p class="result ${ok ? "ok" : "bad"}">${ok ? "答對" : "答錯"}${detail}</p>`;
   }
   const mine = phase !== "front" && typed.trim() && f !== "mc"
