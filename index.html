@@ -24,6 +24,7 @@
   --paper: #121a20; --grid: #1c2730; --card: #1a242d; --ink: #e4ebf1; --muted: #9aaab7;
   --line: #2c3a45; --accent: #7fb0e6; --right: #6cc392; --wrong: #ec8a78; --tag: #22303c; color-scheme: dark } }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* .chips sets display, which would otherwise override hidden */
 html, body { margin: 0; min-height: 100%; }
 body {
   background-color: var(--paper);
@@ -74,6 +75,22 @@ textarea, select { font: inherit; color: var(--ink); background: var(--paper); b
 textarea { min-height: 70px; resize: vertical; }
 .status { font-size: .85rem; color: var(--muted); min-height: 1.2em; }
 .small { font-size: .85rem; color: var(--muted); margin: 0; }
+.choices { display: grid; gap: 8px; }
+.choice { font: inherit; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); cursor: pointer; }
+.choice[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.choice.ok { border-color: var(--right); color: var(--right); font-weight: 700; }
+.choice.bad { border-color: var(--wrong); color: var(--wrong); text-decoration: line-through; }
+.card input[type="text"], .card textarea { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px; width: 100%; }
+.card textarea { min-height: 120px; resize: vertical; user-select: text; }
+.points { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.points label { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); font-size: .95rem; }
+.points input { margin-top: .35em; }
+.result { font-weight: 700; }
+.result.ok { color: var(--right); }
+.result.bad { color: var(--wrong); }
+.round { font-size: .8rem; color: var(--muted); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
 </style>
 </head>
@@ -84,15 +101,17 @@ textarea { min-height: 70px; resize: vertical; }
     <span class="count" id="count">載入中</span>
   </header>
   <div class="decks" id="decks" role="group" aria-label="選擇題庫"></div>
+  <div class="chips" id="scopes" role="group" aria-label="選擇考試範圍" hidden></div>
   <div class="chips" id="groups" role="group" aria-label="選擇大類" hidden></div>
   <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
+  <p class="round" id="round"></p>
 
   <div class="stage" id="stage" aria-live="polite">
     <article class="card" id="card"><div class="q">正在載入題目……</div></article>
   </div>
   <div class="actions" id="actions"></div>
 
-  <div class="note">先在心裡或紙上答完，再選「有把握」或「不確定」翻面。翻面後往右滑＝答對、往左滑＝答錯（也可以按按鈕或鍵盤左右鍵）。答錯的卡會在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。</div>
+  <div class="note">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡則先在心裡答完再翻面，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次；答對的卡依 1、3、7、14、30 天的間隔再出現。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。</div>
 
   <details class="box">
     <summary>自己做一張卡</summary>
@@ -119,28 +138,34 @@ textarea { min-height: 70px; resize: vertical; }
   <p class="small" id="offline"></p>
 </div>
 
+<script src="engine.js"></script>
 <script>
-const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];  // Leitner box -> days until due after a right answer
-const DAY = 86400000;
 const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", exam: "國考選擇題", mine: "自製" };
-// Each deck keeps its own cards, progress and exports, so the subjects never mix. The statistics
-// deck keeps the storage key it had before decks existed; newPerRound caps unseen cards per round
-// for a deck too large to meet all at once.
+const HINT = { mc: "點選一個答案，再選有把握或不確定送出", num: "輸入數字（可用小數、分數或百分比），再送出",
+               essay: "寫下答案（條列要點即可），再送出", flip: "先答完再翻面" };
+// Each deck keeps its own cards, progress, ability estimates and exports, so the subjects never mix.
+// The statistics deck keeps the storage key it had before decks existed. newStart is the number of
+// new cards per round before the app has learned anything about the learner (engine.js adjusts it).
 const DECKS = {
-  stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1" },
-  research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newPerRound: 30 },
+  stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1", newStart: 15 },
+  research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newStart: 20 },
 };
 const DECK_KEY = "swipe-cards-deck";
 
-let deckId = "stats", deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
-let chapter = "all", group = "all", retried = new Set();
+let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], current = null;
+// phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
+let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
+let scope = "all", chapter = "all", group = "all", retried = new Set();
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
+function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {} }; }
 function load() {
-  state = { progress: {}, mine: [] };
-  try { const s = JSON.parse(localStorage.getItem(D().key) || "null"); if (s && s.progress) state = { progress: s.progress, mine: s.mine || [] }; }
-  catch (e) { /* storage blocked: practise without saving */ }
+  state = blank();
+  try {
+    const s = JSON.parse(localStorage.getItem(D().key) || "null");
+    if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [] };
+  } catch (e) { /* storage blocked: practise without saving */ }
 }
 function save() {
   try { localStorage.setItem(D().key, JSON.stringify(state)); return true; }
@@ -164,51 +189,89 @@ function md(text) {
 }
 
 function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
-function isDue(c, now) { const p = state.progress[c.id]; return !p || p.due <= now; }
-// A deck whose cards carry a group (研究法: 量化, 質性, 通論) gets a second row of chips above its topics.
-function inGroup(c) { return group === "all" || c.group === group; }
+function format(c) { return ["mc", "num", "essay"].includes(c.format) ? c.format : "flip"; }
+// Filters, outermost first: exam scope (期中／期末, by course chapter), group (量化／質性／通論), chapter.
+function inScope(c) { const s = scopes.find(x => x.id === scope); return scope === "all" || (!!s && s.ch.includes(c.ch)); }
+function inGroup(c) { return inScope(c) && (group === "all" || c.group === group); }
 function inChapter(c) { return inGroup(c) && (chapter === "all" || c.chapter === chapter); }
 
 function shuffle(list) {
   for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
   return list;
 }
-// Cards seen before and due (or all seen ones, for a round that ignores due dates), plus unseen
-// cards up to the deck's newPerRound.
-function roundCards(cards, ignoreDue) {
-  const now = Date.now(), cap = D().newPerRound || Infinity;
-  const seen = cards.filter(c => state.progress[c.id] && (ignoreDue || isDue(c, now)));
-  const fresh = cards.filter(c => !state.progress[c.id]);
-  return seen.concat(shuffle(fresh).slice(0, cap));
+function newCap() { return state.settings.newPerRound || D().newStart; }
+function dueCount() {
+  const now = Date.now();
+  return allCards().filter(c => state.progress[c.id] && state.progress[c.id].due <= now).length;
+}
+function roundSize(cards) {
+  const r = Engine.buildRound(cards, state, { now: Date.now(), cap: newCap(), random: () => 0 });
+  return r.seen.length + r.fresh.length;
 }
 
 function buildQueue(ignoreDue) {
-  queue = shuffle(roundCards(allCards().filter(inChapter), ignoreDue));
+  state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
+  save();
+  const r = Engine.buildRound(allCards().filter(inChapter), state, { now: Date.now(), cap: newCap(), ignoreDue });
+  queue = shuffle(r.seen.concat(r.fresh));
   retried = new Set();
+  const scores = Engine.recentScores(state.progress, 30);
+  const acc = scores.length ? `，近 ${scores.length} 題得分率 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
+  $("round").textContent = `本輪：複習 ${r.seen.length} 張、新卡 ${r.fresh.length} 張（每輪新卡上限 ${newCap()}${acc}）`;
 }
 
+function chipRow(el, items, active, attr) {
+  el.innerHTML = items.map(([key, text, n]) =>
+    `<button class="chip" data-${attr}="${esc(key)}" aria-pressed="${active === key}">${esc(text)} · ${n}</button>`).join("");
+}
 function renderChips() {
   const cards = allCards();
-  const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
-  const groups = [...new Map([...cards].sort((a, b) => a.chapter < b.chapter ? -1 : 1)
-                               .filter(c => c.group).map(c => [c.group, 1])).keys()];
-  const count = pick => roundCards(cards.filter(pick), false).length;
+  $("scopes").hidden = !scopes.length;
+  chipRow($("scopes"), [["all", "全部範圍", roundSize(cards)],
+    ...scopes.map(s => [s.id, s.title, roundSize(cards.filter(c => s.ch.includes(c.ch)))])], scope, "s");
+  const inS = cards.filter(inScope);
+  const groups = [...new Set([...inS].sort((a, b) => a.chapter < b.chapter ? -1 : 1).filter(c => c.group).map(c => c.group))];
   $("groups").hidden = !groups.length;
-  $("groups").innerHTML = ["all", ...groups].map(g =>
-    `<button class="chip" data-g="${esc(g)}" aria-pressed="${group === g}">${g === "all" ? "全部大類" : esc(g)} · ${count(c => g === "all" || c.group === g)}</button>`).join("");
-  const inG = [...new Map(cards.filter(inGroup).map(c => [c.chapter, c.label])).entries()].sort();
+  chipRow($("groups"), [["all", "全部大類", roundSize(inS)],
+    ...groups.map(g => [g, g, roundSize(inS.filter(c => c.group === g))])], group, "g");
+  const inG = cards.filter(inGroup);
+  const chapters = [...new Map(inG.map(c => [c.chapter, c.label])).entries()].sort();
   const short = l => group === "all" ? l : l.split("｜").pop();
-  const btn = (key, text) =>
-    `<button class="chip" data-ch="${esc(key)}" aria-pressed="${chapter === key}">${esc(text)} · ${count(c => inGroup(c) && (key === "all" || c.chapter === key))}</button>`;
-  $("chips").innerHTML = btn("all", group === "all" ? "全部" : `全部${group}`) + inG.map(([k, l]) => btn(k, short(l))).join("");
+  chipRow($("chips"), [["all", group === "all" ? "全部" : `全部${group}`, roundSize(inG)],
+    ...chapters.map(([k, l]) => [k, short(l), roundSize(inG.filter(c => c.chapter === k))])], chapter, "ch");
+  const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
   $("addChapter").innerHTML = all.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
 }
 
-function setActions(kind) {
+function setActions() {
+  const f = current ? format(current) : "";
   $("actions").innerHTML =
-    kind === "front" ? `<button class="big" id="unsure" type="button">翻面：不確定</button><button class="big sure" id="sure" type="button">翻面：有把握</button>` :
-    kind === "back" ? `<button class="big wrong" id="bad" type="button">← 答錯</button><button class="big right" id="good" type="button">答對 →</button>` :
-    kind === "done" ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "";
+    !current ? (deck.length ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "") :
+    phase === "front" ? `<button class="big" id="unsure" type="button">${f === "flip" ? "翻面" : "送出"}：不確定</button><button class="big sure" id="sure" type="button">${f === "flip" ? "翻面" : "送出"}：有把握</button>` :
+    phase === "back" ? `<button class="big wrong" id="bad" type="button">← 答錯</button><button class="big right" id="good" type="button">答對 →</button>` :
+    phase === "rubric" ? `<span></span><button class="big sure" id="score" type="button">完成評分</button>` :
+    `<span></span><button class="big sure" id="next" type="button">下一張 →</button>`;
+}
+
+function answerBody(c) {
+  const f = format(c), done = phase === "result";
+  if (f === "mc") {
+    const items = (c.choices || []).map(([k, t]) => {
+      const cls = done && (c.answer || []).includes(k) ? " ok" : done && picked === k ? " bad" : "";
+      return `<button type="button" class="choice${cls}" data-k="${esc(k)}" aria-pressed="${picked === k}" ${done ? "disabled" : ""}>(${esc(k)}) ${md(t)}</button>`;
+    });
+    return `<div class="choices">${items.join("")}</div>`;
+  }
+  if (f === "num") return `<input type="text" id="numIn" inputmode="decimal" autocomplete="off" aria-label="你的答案" value="${esc(typed)}" ${done ? "disabled" : ""}>`;
+  if (f === "essay") {
+    let html = `<textarea id="essayIn" aria-label="你的答案" ${phase === "front" ? "" : "readonly"}>${esc(typed)}</textarea>`;
+    if (phase !== "front") {
+      html += `<div class="a"><div class="label">評分要點（勾選你有寫到的）</div><ul class="points">${(c.points || []).map((p, i) =>
+        `<li><label><input type="checkbox" data-i="${i}" ${ticks[i] ? "checked" : ""} ${done ? "disabled" : ""}>${md(p.t)}</label></li>`).join("")}</ul></div>`;
+    }
+    return html;
+  }
+  return "";
 }
 
 function render() {
@@ -217,30 +280,59 @@ function render() {
   card.style.transform = ""; card.style.opacity = "";
   if (!current) {
     card.innerHTML = deck.length
-      ? `<div class="meta"><span>今天完成</span></div><div class="q">這一輪到期的卡片都做完了。</div><p class="hint">明天再回來。分開幾天複習，比一次做很多張記得久。</p>`
+      ? `<div class="meta"><span>今天完成</span></div><div class="q">這一輪的卡片都做完了。</div><p class="hint">明天再回來。分開幾天複習，比一次做很多張記得久。</p>`
       : `<div class="meta"><span>沒有題目</span></div><div class="q">題目還沒下載。請連上網路後重新開啟。</div>`;
-    setActions(deck.length ? "done" : "");
+    setActions();
     return;
   }
-  const c = current, p = state.progress[c.id];
+  const c = current, p = state.progress[c.id], f = format(c);
+  const showAnswer = phase === "back" || phase === "result" || (f === "essay" && phase === "rubric");
+  let result = "";
+  if (phase === "result") {
+    const ok = Engine.passed(c, lastScore);
+    const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${c.num.value}）` : "";
+    result = `<p class="result ${ok ? "ok" : "bad"}">${ok ? "答對" : "答錯"}${detail}</p>`;
+  }
   card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div>
-    <div class="meta"><span>${esc(c.label || c.chapter)}</span><span>${c.type ? esc(c.type) : KIND[c.kind] || esc(c.kind)}</span><span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
+    <div class="meta"><span>${esc(c.label || c.chapter)}</span>${c.type || KIND[c.kind] ? `<span>${esc(c.type || KIND[c.kind])}</span>` : ""}${c.level ? `<span>${Engine.LEVEL_NAME[c.level]}</span>` : ""}<span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
     <div class="q">${md(c.q)}</div>
-    ${flipped ? `<div class="a"><div class="label">答案</div>${md(c.a)}</div>` : ""}
-    <p class="hint">${flipped ? "往右滑＝答對，往左滑＝答錯" : "先答完再翻面"}</p>`;
-  setActions(flipped ? "back" : "front");
+    ${answerBody(c)}
+    ${result}
+    ${showAnswer && c.a ? `<div class="a"><div class="label">${f === "essay" ? "參考答案" : "答案與說明"}</div>${md(c.a)}</div>` : ""}
+    <p class="hint">${phase === "back" ? "往右滑＝答對，往左滑＝答錯" : phase === "result" ? "左右滑或按「下一張」繼續" : phase === "rubric" ? "依實際寫到的內容勾選，再按完成評分" : HINT[f]}</p>`;
+  setActions();
 }
 
-function next() { current = queue.shift() || null; flipped = false; render(); }
-function flip(isSure) { sure = isSure ? 1 : 0; flipped = true; render(); }
+function next() { current = queue.shift() || null; phase = "front"; picked = null; typed = ""; ticks = []; render(); }
 
-function grade(right) {
+function submit(isSure) {
+  const c = current, f = format(c);
+  sure = isSure ? 1 : 0;
+  if (f === "flip") { phase = "back"; return render(); }
+  if (f === "mc" && !picked) { $("card").querySelector(".hint").textContent = "先點選一個答案"; return; }
+  if (f === "num" && !typed.trim()) { $("card").querySelector(".hint").textContent = "先輸入答案"; return; }
+  if (f === "essay") { ticks = Engine.matchPoints(c, typed); phase = "rubric"; return render(); }
+  record(Engine.grade(c, f === "mc" ? picked : typed));
+}
+
+// Saves one attempt: Leitner box, ability, and for essays the text written, then shows the result
+// (auto-graded formats) or moves on (flip cards, graded by the swipe itself).
+function record(score) {
   const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
-  const box = right ? Math.min(p.box + 1, INTERVAL_DAYS.length - 1) : 0;
-  state.progress[c.id] = { chapter: c.chapter, kind: c.kind, box, due: now + INTERVAL_DAYS[box] * DAY,
-                           log: [...p.log, [now, right ? 1 : 0, sure]] };
+  const right = Engine.passed(c, score), s = Engine.schedule(p, right, now);
+  const entry = [now, right ? 1 : 0, sure];
+  if (score !== 0 && score !== 1) entry.push(score);
+  state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
+  Engine.updateAbility(state.model, c, score);
+  if (format(c) === "essay") state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
   save();
   if (!right && !retried.has(c.id)) { retried.add(c.id); queue.push(c); }
+  lastScore = score;
+  if (format(c) === "flip") return advance(right);
+  phase = "result"; render();
+}
+
+function advance(right) {
   const card = $("card");
   card.style.transform = `translateX(${right ? 420 : -420}px) rotate(${right ? 14 : -14}deg)`;
   card.style.opacity = "0";
@@ -249,45 +341,63 @@ function grade(right) {
 }
 
 let startX = null;
-$("stage").addEventListener("pointerdown", e => { if (current && flipped) { startX = e.clientX; $("card").style.transition = "none"; } });
+$("stage").addEventListener("pointerdown", e => {
+  if (current && (phase === "back" || phase === "result") && !e.target.closest("button, input, textarea")) {
+    startX = e.clientX; $("card").style.transition = "none";
+  }
+});
 window.addEventListener("pointermove", e => {
   if (startX === null) return;
   const dx = e.clientX - startX, card = $("card");
   card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
-  card.querySelector(".stamp.right").style.opacity = Math.max(0, Math.min(1, dx / 90));
-  card.querySelector(".stamp.wrong").style.opacity = Math.max(0, Math.min(1, -dx / 90));
+  if (phase === "back") {
+    card.querySelector(".stamp.right").style.opacity = Math.max(0, Math.min(1, dx / 90));
+    card.querySelector(".stamp.wrong").style.opacity = Math.max(0, Math.min(1, -dx / 90));
+  }
 });
 function endDrag(e) {
   if (startX === null) return;
   const dx = e.clientX - startX; startX = null;
   $("card").style.transition = "";
-  if (Math.abs(dx) > 90 && current) grade(dx > 0); else render();
+  if (Math.abs(dx) <= 90 || !current) return render();
+  if (phase === "back") record(dx > 0 ? 1 : 0); else advance(Engine.passed(current, lastScore));
 }
 window.addEventListener("pointerup", endDrag);
 window.addEventListener("pointercancel", endDrag);
 
+$("card").addEventListener("click", e => {
+  const b = e.target.closest(".choice");
+  if (b && phase === "front") { picked = b.dataset.k; render(); }
+});
+$("card").addEventListener("input", e => {
+  if (e.target.id === "numIn" || e.target.id === "essayIn") typed = e.target.value;
+  if (e.target.dataset && e.target.dataset.i !== undefined) ticks[Number(e.target.dataset.i)] = e.target.checked;
+});
 $("actions").addEventListener("click", e => {
   const id = e.target.id;
-  if (id === "sure") flip(true);
-  if (id === "unsure") flip(false);
-  if (id === "good" && current) grade(true);
-  if (id === "bad" && current) grade(false);
+  if (id === "sure" || id === "unsure") submit(id === "sure");
+  if (id === "good" && current) record(1);
+  if (id === "bad" && current) record(0);
+  if (id === "score" && current) { const n = (current.points || []).length; record(Engine.grade(current, Array.from({ length: n }, (_, i) => !!ticks[i]))); }
+  if (id === "next" && current) advance(Engine.passed(current, lastScore));
   if (id === "again") { buildQueue(true); next(); }
 });
 window.addEventListener("keydown", e => {
-  if (!current || e.target.closest("form, details")) return;
-  if (!flipped && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); flip(e.key === "ArrowUp"); }
-  else if (flipped && e.key === "ArrowRight") grade(true);
-  else if (flipped && e.key === "ArrowLeft") grade(false);
+  if (!current || e.target.closest("form, details, textarea, input")) return;
+  const f = format(current);
+  if (phase === "front" && f === "mc" && /^[1-5a-eA-E]$/.test(e.key)) {
+    const k = /\d/.test(e.key) ? "ABCDE"[Number(e.key) - 1] : e.key.toUpperCase();
+    if ((current.choices || []).some(([x]) => x === k)) { picked = k; render(); }
+  } else if (phase === "front" && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); submit(e.key === "ArrowUp"); }
+  else if (phase === "back" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) record(e.key === "ArrowRight" ? 1 : 0);
+  else if (phase === "result" && (e.key === "ArrowRight" || e.key === "Enter")) advance(Engine.passed(current, lastScore));
 });
-$("chips").addEventListener("click", e => {
-  const b = e.target.closest(".chip"); if (!b) return;
-  chapter = b.dataset.ch; renderChips(); buildQueue(); next();
-});
-$("groups").addEventListener("click", e => {
-  const b = e.target.closest(".chip"); if (!b) return;
-  group = b.dataset.g; chapter = "all"; renderChips(); buildQueue(); next();
-});
+function pickFilter(attr, apply) {
+  return e => { const b = e.target.closest(".chip"); if (!b) return; apply(b.dataset[attr]); state.ui = { scope }; save(); renderChips(); buildQueue(); next(); };
+}
+$("scopes").addEventListener("click", pickFilter("s", v => { scope = v; group = "all"; chapter = "all"; }));
+$("groups").addEventListener("click", pickFilter("g", v => { group = v; chapter = "all"; }));
+$("chips").addEventListener("click", pickFilter("ch", v => { chapter = v; }));
 
 $("addForm").addEventListener("submit", e => {
   e.preventDefault();
@@ -296,6 +406,7 @@ $("addForm").addEventListener("submit", e => {
   const from = deck.find(c => c.chapter === ch) || {};
   const card = { id: "mine-" + Date.now().toString(36), chapter: ch, label: from.label || ch, q, a, created: Date.now() };
   if (from.group) card.group = from.group;
+  if (from.ch !== undefined) card.ch = from.ch;
   state.mine.push(card);
   if (save()) { $("addQ").value = ""; $("addA").value = ""; $("addStatus").textContent = "已加入，這一輪最後會出現。"; }
   queue.push({ ...card, kind: "mine" }); renderChips();
@@ -303,7 +414,8 @@ $("addForm").addEventListener("submit", e => {
 
 function exportText() {
   return JSON.stringify({ exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
-                          progress: state.progress, mine: state.mine }, null, 1);
+                          progress: state.progress, mine: state.mine, model: state.model, settings: state.settings,
+                          essays: state.essays }, null, 1);
 }
 $("export").addEventListener("click", () => {
   const blob = new Blob([exportText()], { type: "application/json" });
@@ -318,6 +430,7 @@ $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(exportText()); $("backupStatus").textContent = "已複製，可貼到記事本存成 .json 檔。"; }
   catch (e) { $("backupStatus").textContent = "這個瀏覽器不允許複製，請改用「匯出成績」。"; }
 });
+function attempts(model) { return Object.values((model || {}).n || {}).reduce((a, b) => a + b, 0); }
 $("importFile").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
   try {
@@ -328,10 +441,15 @@ $("importFile").addEventListener("change", async e => {
       $("backupStatus").textContent = `這是「${(DECKS[from] || { title: from }).title}」的成績，請先切換到那個題庫再匯入。`;
       e.target.value = ""; return;
     }
-    // Merge: keep, for each card, whichever side has the longer history.
+    // Merge: keep, for each card, whichever side has the longer history; the same for the ability model.
     for (const [id, p] of Object.entries(data.progress)) {
       const mine = state.progress[id];
       if (!mine || (p.log || []).length > mine.log.length) state.progress[id] = p;
+    }
+    if (attempts(data.model) > attempts(state.model)) { state.model = data.model; state.settings = data.settings || {}; }
+    for (const [id, list] of Object.entries(data.essays || {})) {
+      const seen = new Set((state.essays[id] || []).map(x => x.t));
+      state.essays[id] = [...(state.essays[id] || []), ...list.filter(x => !seen.has(x.t))].sort((a, b) => a.t - b.t).slice(-3);
     }
     const have = new Set(state.mine.map(m => m.id));
     for (const m of data.mine || []) if (!have.has(m.id)) state.mine.push(m);
@@ -355,12 +473,13 @@ function renderDecks() {
 async function openDeck(id) {
   deckId = DECKS[id] ? id : "stats";
   try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
-  chapter = "all"; group = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
+  group = "all"; chapter = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
   renderDecks(); load();
   try {
-    const res = await fetch(D().file, { cache: "no-cache" });
-    deck = (await res.json()).cards || [];
-  } catch (e) { deck = []; }
+    const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
+    deck = doc.cards || []; scopes = doc.scopes || [];
+  } catch (e) { deck = []; scopes = []; }
+  scope = scopes.some(s => s.id === (state.ui || {}).scope) ? state.ui.scope : "all";
   renderChips(); buildQueue(); next();
 }
 $("decks").addEventListener("click", e => {
