@@ -40,6 +40,9 @@ h1 { font-family: var(--font-display); font-size: 1.45rem; margin: 0; letter-spa
 .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px;
   font: inherit; font-size: .85rem; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.decks { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.deck { font: inherit; font-weight: 700; padding: 8px; border: 0; background: var(--card); color: var(--muted); cursor: pointer; }
+.deck[aria-pressed="true"] { background: var(--accent); color: var(--card); }
 .stage { position: relative; min-height: 360px; touch-action: pan-y; }
 .card { position: absolute; inset: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 10px 28px rgb(0 0 0 / .08); padding: 20px; display: flex; flex-direction: column; gap: 12px;
@@ -77,9 +80,10 @@ textarea { min-height: 70px; resize: vertical; }
 <body>
 <div class="wrap">
   <header>
-    <h1>社會統計滑卡</h1>
+    <h1 id="title">社會統計滑卡</h1>
     <span class="count" id="count">載入中</span>
   </header>
+  <div class="decks" id="decks" role="group" aria-label="選擇題庫"></div>
   <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
 
   <div class="stage" id="stage" aria-live="polite">
@@ -117,19 +121,28 @@ textarea { min-height: 70px; resize: vertical; }
 <script>
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];  // Leitner box -> days until due after a right answer
 const DAY = 86400000;
-const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", mine: "自製" };
-const KEY = "swipe-cards-v1";
+const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", exam: "國考選擇題", mine: "自製" };
+// Each deck keeps its own cards, progress and exports, so the subjects never mix. The statistics
+// deck keeps the storage key it had before decks existed; newPerRound caps unseen cards per round
+// for a deck too large to meet all at once.
+const DECKS = {
+  stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1" },
+  research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newPerRound: 30 },
+};
+const DECK_KEY = "swipe-cards-deck";
 
-let deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
+let deckId = "stats", deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
 let chapter = "all", retried = new Set();
 const $ = id => document.getElementById(id);
+const D = () => DECKS[deckId];
 
 function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.progress) state = { progress: s.progress, mine: s.mine || [] }; }
+  state = { progress: {}, mine: [] };
+  try { const s = JSON.parse(localStorage.getItem(D().key) || "null"); if (s && s.progress) state = { progress: s.progress, mine: s.mine || [] }; }
   catch (e) { /* storage blocked: practise without saving */ }
 }
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+  try { localStorage.setItem(D().key, JSON.stringify(state)); return true; }
   catch (e) { $("backupStatus").textContent = "這個瀏覽器不讓 App 存資料，成績不會保留。"; return false; }
 }
 
@@ -153,18 +166,29 @@ function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "min
 function isDue(c, now) { const p = state.progress[c.id]; return !p || p.due <= now; }
 function inChapter(c) { return chapter === "all" || c.chapter === chapter; }
 
-function buildQueue() {
-  const now = Date.now();
-  queue = allCards().filter(c => inChapter(c) && isDue(c, now));
-  for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  return list;
+}
+// Cards seen before and due (or all seen ones, for a round that ignores due dates), plus unseen
+// cards up to the deck's newPerRound.
+function roundCards(cards, ignoreDue) {
+  const now = Date.now(), cap = D().newPerRound || Infinity;
+  const seen = cards.filter(c => state.progress[c.id] && (ignoreDue || isDue(c, now)));
+  const fresh = cards.filter(c => !state.progress[c.id]);
+  return seen.concat(shuffle(fresh).slice(0, cap));
+}
+
+function buildQueue(ignoreDue) {
+  queue = shuffle(roundCards(allCards().filter(inChapter), ignoreDue));
   retried = new Set();
 }
 
 function renderChips() {
-  const cards = allCards(), now = Date.now();
+  const cards = allCards();
   const chapters = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
   const btn = (key, text) => {
-    const n = cards.filter(c => (key === "all" || c.chapter === key) && isDue(c, now)).length;
+    const n = roundCards(cards.filter(c => key === "all" || c.chapter === key), false).length;
     return `<button class="chip" data-ch="${esc(key)}" aria-pressed="${chapter === key}">${esc(text)} · ${n}</button>`;
   };
   $("chips").innerHTML = btn("all", "全部") + chapters.map(([k, l]) => btn(k, l)).join("");
@@ -239,7 +263,7 @@ $("actions").addEventListener("click", e => {
   if (id === "unsure") flip(false);
   if (id === "good" && current) grade(true);
   if (id === "bad" && current) grade(false);
-  if (id === "again") { queue = allCards().filter(inChapter).sort(() => Math.random() - .5); retried = new Set(); next(); }
+  if (id === "again") { buildQueue(true); next(); }
 });
 window.addEventListener("keydown", e => {
   if (!current || e.target.closest("form, details")) return;
@@ -264,14 +288,14 @@ $("addForm").addEventListener("submit", e => {
 });
 
 function exportText() {
-  return JSON.stringify({ exported: new Date().toISOString(), app: "social-statistics-swipe-cards",
+  return JSON.stringify({ exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
                           progress: state.progress, mine: state.mine }, null, 1);
 }
 $("export").addEventListener("click", () => {
   const blob = new Blob([exportText()], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `滑卡成績_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `滑卡成績_${D().title}_${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   $("backupStatus").textContent = "已產生檔案。若沒有出現下載，改用「複製成績文字」。";
@@ -285,6 +309,11 @@ $("importFile").addEventListener("change", async e => {
   try {
     const data = JSON.parse(await file.text());
     if (!data || typeof data.progress !== "object") throw new Error("format");
+    const from = data.deck || "stats";  // exports from before decks existed are statistics
+    if (from !== deckId) {
+      $("backupStatus").textContent = `這是「${(DECKS[from] || { title: from }).title}」的成績，請先切換到那個題庫再匯入。`;
+      e.target.value = ""; return;
+    }
     // Merge: keep, for each card, whichever side has the longer history.
     for (const [id, p] of Object.entries(data.progress)) {
       const mine = state.progress[id];
@@ -302,13 +331,34 @@ function showOnline() { $("offline").textContent = navigator.onLine ? "" : "目�
 window.addEventListener("online", showOnline);
 window.addEventListener("offline", showOnline);
 
-async function start() {
-  load(); showOnline();
+function renderDecks() {
+  $("decks").innerHTML = Object.entries(DECKS).map(([id, d]) =>
+    `<button class="deck" type="button" data-deck="${id}" aria-pressed="${id === deckId}">${esc(d.title)}</button>`).join("");
+  $("title").textContent = `${D().title}滑卡`;
+  document.title = `${D().title}滑卡`;
+}
+
+async function openDeck(id) {
+  deckId = DECKS[id] ? id : "stats";
+  try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
+  chapter = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
+  renderDecks(); load();
   try {
-    const res = await fetch("cards.json", { cache: "no-cache" });
+    const res = await fetch(D().file, { cache: "no-cache" });
     deck = (await res.json()).cards || [];
   } catch (e) { deck = []; }
   renderChips(); buildQueue(); next();
+}
+$("decks").addEventListener("click", e => {
+  const b = e.target.closest(".deck");
+  if (b && b.dataset.deck !== deckId) openDeck(b.dataset.deck);
+});
+
+async function start() {
+  showOnline();
+  let saved = "stats";
+  try { saved = localStorage.getItem(DECK_KEY) || "stats"; } catch (e) { /* storage blocked */ }
+  await openDeck(saved);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
