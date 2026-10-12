@@ -73,7 +73,11 @@
   function grade(card, response) {
     if (card.format === "mc") return (card.answer || []).includes(response) ? 1 : 0;
     if (card.format === "num") {
-      const x = parseNumber(response), v = card.num.value;
+      // A percent answer (num.unit "%", value 23 for 23%) accepts "23" and "23%": parseNumber reads
+      // "23%" as 0.23, which would otherwise mark the right answer wrong.
+      let x = parseNumber(response);
+      if (card.num.unit === "%" && /%\s*$/.test(String(response))) x *= 100;
+      const v = card.num.value;
       // Default: 0.5% of the value, at least 0.0005 (an absolute 0.005 would accept p = .008 for .003).
       const tol = card.num.tol === undefined ? Math.max(Math.abs(v) * 0.005, 0.0005) : card.num.tol;
       return Number.isFinite(x) && Math.abs(x - v) <= tol ? 1 : 0;

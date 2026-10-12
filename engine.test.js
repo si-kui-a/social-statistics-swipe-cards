@@ -15,6 +15,10 @@ ok("num: full-width digits and comma", E.parseNumber("１,２００") === 1200);
 ok("num: percent", E.parseNumber("95%") === 0.95);
 ok("num: fraction", Math.abs(E.parseNumber("1/3") - 0.3333) < 1e-3);
 ok("num: garbage is NaN", Number.isNaN(E.parseNumber("abc")));
+const pct = { format: "num", num: { value: 23, unit: "%" } };
+ok("num %: plain number", E.grade(pct, "23") === 1);
+ok("num %: with percent sign", E.grade(pct, "23%") === 1);
+ok("num %: proportion is not the percent", E.grade(pct, "0.23") === 0);
 ok("num: default tolerance", E.grade({ format: "num", num: { value: 100 } }, "100.4") === 1);
 
 // essays
