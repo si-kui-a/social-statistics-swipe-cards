@@ -26,13 +26,21 @@
   function level(card) { return LEVEL_B[card.level] === undefined ? 2 : card.level; }
   function abilityKey(card) { return String(card.ch === undefined ? card.chapter : card.ch); }
   function prob(theta, lvl) { return 1 / (1 + Math.exp(-(theta - LEVEL_B[lvl]))); }
+  // Expected success on a card: a multiple-choice item can be guessed (1 in k choices), so the floor
+  // is 1/k, as in a three-parameter IRT model. Without it a guessed answer reads as knowledge, the
+  // ability estimate runs high and harder cards come too early.
+  function expected(theta, card) {
+    const k = card.format === "mc" && card.choices ? card.choices.length : 0;
+    const floor = k > 1 ? 1 / k : 0;
+    return floor + (1 - floor) * prob(theta, level(card));
+  }
   function theta(model, card) { return (model.theta || {})[abilityKey(card)] || 0; }
 
   function updateAbility(model, card, score) {
     model.theta = model.theta || {}; model.n = model.n || {};
     const k = abilityKey(card), th = model.theta[k] || 0, n = model.n[k] || 0;
     const step = Math.max(0.15, 0.6 / Math.sqrt(1 + n / 10));  // settles as evidence accumulates
-    model.theta[k] = th + step * (score - prob(th, level(card)));
+    model.theta[k] = th + step * (score - expected(th, card));
     model.n[k] = n + 1;
     return model.theta[k];
   }
@@ -66,7 +74,8 @@
     if (card.format === "mc") return (card.answer || []).includes(response) ? 1 : 0;
     if (card.format === "num") {
       const x = parseNumber(response), v = card.num.value;
-      const tol = card.num.tol === undefined ? Math.abs(v) * 0.005 + 0.005 : card.num.tol;
+      // Default: 0.5% of the value, at least 0.0005 (an absolute 0.005 would accept p = .008 for .003).
+      const tol = card.num.tol === undefined ? Math.max(Math.abs(v) * 0.005, 0.0005) : card.num.tol;
       return Number.isFinite(x) && Math.abs(x - v) <= tol ? 1 : 0;
     }
     if (card.format === "essay") {
@@ -88,7 +97,7 @@
     const seen = cards.filter(c => progress[c.id] && (opts.ignoreDue || progress[c.id].due <= now));
     const rand = opts.random || Math.random;
     const fresh = cards.filter(c => !progress[c.id])
-      .map(c => ({ c, d: Math.abs(prob(theta(model, c), level(c)) - TARGET) + rand() * 0.15 }))
+      .map(c => ({ c, d: Math.abs(expected(theta(model, c), c) - TARGET) + rand() * 0.15 }))
       .sort((a, b) => a.d - b.d).map(x => x.c);
     return { seen, fresh: fresh.slice(0, opts.cap) };
   }
@@ -139,7 +148,7 @@
     return errs;
   }
 
-  const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, level, theta, updateAbility, keywordHit,
+  const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, buildRound, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
