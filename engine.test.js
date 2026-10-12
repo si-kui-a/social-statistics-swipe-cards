@@ -86,5 +86,10 @@ ok("score above 1 refused", E.validateExport({ progress: { a: { box: 0, due: 0, 
 ok("not an export refused", E.validateExport({ hello: 1 }).length === 1 && E.validateExport(null).length === 1);
 ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 3: "x" } } }).length === 1);
 
+// service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
+// the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
+const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
+ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw));
+
 console.log(`${fails} failed`);
 process.exit(fails ? 1 : 0);

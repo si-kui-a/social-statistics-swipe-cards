@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Layout check</title>
+<!-- Loaded by layout.test.js in headless Chrome. Opens the app in a phone-sized frame and renders
+     the longest card of every format in every phase; the answer area and the buttons must fit the
+     first screen (2026-10-12: chapter chips wrapped one per line and pushed the whole card below it). -->
+</head>
+<body style="margin:0">
+<iframe id="f" src="../index.html" style="width:390px;height:844px;border:0"></iframe>
+<pre id="out">pending</pre>
+<script>
+(async () => {
+  const out = document.getElementById("out");
+  try {
+    const f = document.getElementById("f");
+    await new Promise(r => f.complete ? r() : f.addEventListener("load", r));
+    await new Promise(r => setTimeout(r, 1500));  // cards.json arrives after load
+    const W = f.contentWindow, D = f.contentDocument;
+    const decks = await Promise.all(["../cards.json", "../cards-research.json"].map(u => fetch(u).then(r => r.json())));
+    const cards = decks.flatMap(d => d.cards);
+    const longest = {};
+    for (const c of cards) {
+      const fmt = W.format(c);
+      if (!longest[fmt] || c.q.length > longest[fmt].q.length) longest[fmt] = c;
+    }
+    // A number card may not exist in the data yet; check the layout with a stand-in.
+    if (!longest.num) longest.num = { ...longest.essay, id: "x-num", format: "num", num: { value: 1 } };
+    const after = { mc: "result", num: "result", essay: "rubric", flip: "back" };
+    const failures = [], seen = [];
+    for (const [fmt, c] of Object.entries(longest)) {
+      for (const phase of ["front", after[fmt]]) {
+        W.eval(`queue = []; phase = ${JSON.stringify(phase)}; typed = "1. x"; picked = "A"; ticks = []; lastScore = 0;`);
+        // the app's state lives in top-level let bindings, reachable only through eval
+        W.eval(`current = ${JSON.stringify(c)}; render();`);
+        const actions = D.getElementById("actions").getBoundingClientRect();
+        const work = D.querySelector("#card .work");
+        const meta = D.querySelector("#card .meta");
+        const where = `${fmt}/${phase} (${c.id})`;
+        seen.push(where);
+        if (actions.bottom > W.innerHeight) failures.push(`${where}: buttons end at ${Math.round(actions.bottom)}px, screen is ${W.innerHeight}px`);
+        if (work && work.getBoundingClientRect().bottom > W.innerHeight) failures.push(`${where}: answer area below the first screen`);
+        if (D.documentElement.scrollWidth > W.innerWidth) failures.push(`${where}: page scrolls sideways (${D.documentElement.scrollWidth}px)`);
+        if (meta && meta.scrollHeight > meta.clientHeight + 2) failures.push(`${where}: card tags wrap to a second line`);
+        if (phase === "front" && fmt !== "mc" && !work) failures.push(`${where}: no answer area`);
+      }
+    }
+    W.localStorage.clear();
+    out.textContent = JSON.stringify({ seen, failures });
+  } catch (e) {
+    out.textContent = JSON.stringify({ seen: [], failures: [`check crashed: ${e}`] });
+  }
+})();
+</script>
+</body>
+</html>

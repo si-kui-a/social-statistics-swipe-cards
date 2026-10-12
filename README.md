@@ -52,6 +52,7 @@
 | `index.html` | 版面與操作 |
 | `engine.js` | 批改、能力估計、選題與每輪新卡數（不碰畫面） |
 | `engine.test.js` | `engine.js` 的測試：`node engine.test.js` |
+| `layout.test.js` | 手機版面檢查（390×844，用本機 Chrome）：每種題型的作答區與按鈕都要在第一屏內，`node layout.test.js`；CI 也會跑 |
 | `cards.json` | 社會統計題目，由產生程式覆寫，不要手動編輯 |
 | `cards-research.json` | 社會研究法題目，由產生程式覆寫，不要手動編輯 |
 | `sw.js` | 離線快取 |
