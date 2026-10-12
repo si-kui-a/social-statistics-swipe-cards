@@ -18,3 +18,5 @@ jobs:
           persist-credentials: false
       # Same command as a local run; the runner's preinstalled Node is enough (no dependencies)
       - run: node engine.test.js
+      # Phone layout (390x844): the runner's preinstalled Chrome, still no dependencies
+      - run: node layout.test.js
