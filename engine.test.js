@@ -17,6 +17,15 @@ ok("num: fraction", Math.abs(E.parseNumber("1/3") - 0.3333) < 1e-3);
 ok("num: garbage is NaN", Number.isNaN(E.parseNumber("abc")));
 ok("num: default tolerance", E.grade({ format: "num", num: { value: 100 } }, "100.4") === 1);
 
+// confidence: moves the schedule, not the score
+ok("sure right promotes", E.schedule({ box: 2 }, true, 0, 1).box === 3);
+ok("unsure right keeps the box", E.schedule({ box: 2 }, true, 0, 0).box === 2);
+ok("unsure right on a new card comes back in a day", E.schedule(null, true, 0, 0).box === 1);
+ok("wrong resets either way", E.schedule({ box: 4 }, false, 0, 1).box === 0 && E.schedule({ box: 4 }, false, 0, 0).box === 0);
+ok("schedule without sure promotes as before", E.schedule({ box: 2 }, true, 0).box === 3);
+ok("confident wrong retried soon", E.retryAt(10, 1) === 3 && E.retryAt(2, 1) === 2);
+ok("unsure wrong retried at the end", E.retryAt(10, 0) === 10);
+
 // essays
 const essay = { format: "essay", points: [{ t: "隨機", kw: ["隨機抽樣", "random"] }, { t: "代表性", kw: ["代表性"] }] };
 ok("keyword hit", E.matchPoints(essay, "採用隨機抽樣以確保代表性").join() === "true,true");
