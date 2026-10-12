@@ -1,7 +1,7 @@
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
-const CACHE = "swipe-cards-v2";
-const FILES = ["./", "index.html", "cards.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
+const CACHE = "swipe-cards-v4";
+const FILES = ["./", "index.html", "engine.js", "cards.json", "cards-research.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
                "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", event => {
@@ -17,7 +17,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
-  const fresh = url.pathname.endsWith("/") || url.pathname.endsWith(".html") || url.pathname.endsWith("cards.json");
+  const fresh = url.pathname.endsWith("/") || /\.(html|js|json)$/.test(url.pathname);
   if (fresh) {
     event.respondWith(fetch(event.request).then(res => {
       const copy = res.clone();
