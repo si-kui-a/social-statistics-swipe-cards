@@ -131,6 +131,7 @@ textarea { min-height: 70px; resize: vertical; }
       <button class="big sure" id="export" type="button">匯出成績</button>
       <button class="big" id="copy" type="button">複製成績文字</button>
       <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
+      <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
       <div class="status" id="backupStatus"></div>
     </div>
   </details>
@@ -167,10 +168,28 @@ function load() {
     if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [] };
   } catch (e) { /* storage blocked: practise without saving */ }
 }
+// Say why a save failed: a full store needs an export, blocked storage cannot be fixed from here.
+function saveError(e) {
+  const msg = e && e.name === "QuotaExceededError"
+    ? "手機上的 App 儲存空間已滿，這次作答沒有存到：請先「匯出成績」備份。"
+    : `這次作答沒有存到（${(e && e.name) || "儲存失敗"}）：瀏覽器可能封鎖了網站資料，或正在使用私密瀏覽。`;
+  $("backupStatus").textContent = msg; $("round").textContent = msg;
+}
 function save() {
   try { localStorage.setItem(D().key, JSON.stringify(state)); return true; }
-  catch (e) { $("backupStatus").textContent = "這個瀏覽器不讓 App 存資料，成績不會保留。"; return false; }
+  catch (e) { saveError(e); return false; }
 }
+// An essay or answer being written survives switching apps or the phone reclaiming the page.
+const draftKey = () => `${D().key}.draft`;
+let draftTimer = null;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    try { if (current) localStorage.setItem(draftKey(), JSON.stringify({ id: current.id, typed, picked })); } catch (e) { /* draft only */ }
+  }, 300);
+}
+function loadDraft() { try { return JSON.parse(localStorage.getItem(draftKey()) || "null"); } catch (e) { return null; } }
+function clearDraft() { clearTimeout(draftTimer); try { localStorage.removeItem(draftKey()); } catch (e) { /* draft only */ } }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function md(text) {
@@ -214,6 +233,9 @@ function buildQueue(ignoreDue) {
   save();
   const r = Engine.buildRound(allCards().filter(inChapter), state, { now: Date.now(), cap: newCap(), ignoreDue });
   queue = shuffle(r.seen.concat(r.fresh));
+  // An unfinished answer comes back first, even when this round would not have drawn its card.
+  const d = loadDraft(), held = d && allCards().filter(inChapter).find(c => c.id === d.id);
+  if (held) queue = [held, ...queue.filter(c => c.id !== held.id)];
   retried = new Set();
   const scores = Engine.recentScores(state.progress, 30);
   const acc = scores.length ? `，近 ${scores.length} 題得分率 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
@@ -303,7 +325,12 @@ function render() {
   setActions();
 }
 
-function next() { current = queue.shift() || null; phase = "front"; picked = null; typed = ""; ticks = []; render(); }
+function next() {
+  current = queue.shift() || null; phase = "front"; picked = null; typed = ""; ticks = [];
+  const d = loadDraft();
+  if (current && d && d.id === current.id) { typed = d.typed || ""; picked = d.picked || null; }
+  render();
+}
 
 function submit(isSure) {
   const c = current, f = format(c);
@@ -325,7 +352,7 @@ function record(score) {
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   Engine.updateAbility(state.model, c, score);
   if (format(c) === "essay") state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
-  save();
+  save(); clearDraft();
   if (!right && !retried.has(c.id)) { retried.add(c.id); queue.push(c); }
   lastScore = score;
   if (format(c) === "flip") return advance(right);
@@ -367,10 +394,10 @@ window.addEventListener("pointercancel", endDrag);
 
 $("card").addEventListener("click", e => {
   const b = e.target.closest(".choice");
-  if (b && phase === "front") { picked = b.dataset.k; render(); }
+  if (b && phase === "front") { picked = b.dataset.k; saveDraft(); render(); }
 });
 $("card").addEventListener("input", e => {
-  if (e.target.id === "numIn" || e.target.id === "essayIn") typed = e.target.value;
+  if (e.target.id === "numIn" || e.target.id === "essayIn") { typed = e.target.value; saveDraft(); }
   if (e.target.dataset && e.target.dataset.i !== undefined) ticks[Number(e.target.dataset.i)] = e.target.checked;
 });
 $("actions").addEventListener("click", e => {
@@ -413,7 +440,7 @@ $("addForm").addEventListener("submit", e => {
 });
 
 function exportText() {
-  return JSON.stringify({ exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
+  return JSON.stringify({ schemaVersion: Engine.EXPORT_VERSION, exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
                           progress: state.progress, mine: state.mine, model: state.model, settings: state.settings,
                           essays: state.essays }, null, 1);
 }
@@ -431,20 +458,31 @@ $("copy").addEventListener("click", async () => {
   catch (e) { $("backupStatus").textContent = "這個瀏覽器不允許複製，請改用「匯出成績」。"; }
 });
 function attempts(model) { return Object.values((model || {}).n || {}).reduce((a, b) => a + b, 0); }
+// Import refuses the whole file on any problem (nothing changes), keeps a snapshot of the state it
+// replaces so 復原到匯入前 can undo it, and reports a failure during the merge itself instead of
+// calling the file invalid (finance-tools: an untested catch once hid the real error).
+const snapshotKey = () => `${D().key}.before-import`;
+function showUndo() { let has = false; try { has = !!localStorage.getItem(snapshotKey()); } catch (e) { /* none */ } $("undoImport").hidden = !has; }
 $("importFile").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
+  e.target.value = "";
+  let data;
+  try { data = JSON.parse(await file.text()); }
+  catch (err) { $("backupStatus").textContent = "這個檔案不是完整的 JSON，未匯入，現有成績沒有變動。"; return; }
+  const errs = Engine.validateExport(data);
+  if (errs.length) { $("backupStatus").textContent = `未匯入，現有成績沒有變動：${errs.join("；")}。`; return; }
+  const from = data.deck || "stats";  // exports from before decks existed are statistics
+  if (from !== deckId) {
+    $("backupStatus").textContent = `這是「${(DECKS[from] || { title: from }).title}」的成績，請先切換到那個題庫再匯入。`;
+    return;
+  }
+  try { localStorage.setItem(snapshotKey(), JSON.stringify(state)); }
+  catch (err) { saveError(err); return; }
   try {
-    const data = JSON.parse(await file.text());
-    if (!data || typeof data.progress !== "object") throw new Error("format");
-    const from = data.deck || "stats";  // exports from before decks existed are statistics
-    if (from !== deckId) {
-      $("backupStatus").textContent = `這是「${(DECKS[from] || { title: from }).title}」的成績，請先切換到那個題庫再匯入。`;
-      e.target.value = ""; return;
-    }
     // Merge: keep, for each card, whichever side has the longer history; the same for the ability model.
     for (const [id, p] of Object.entries(data.progress)) {
       const mine = state.progress[id];
-      if (!mine || (p.log || []).length > mine.log.length) state.progress[id] = p;
+      if (!mine || p.log.length > mine.log.length) state.progress[id] = p;
     }
     if (attempts(data.model) > attempts(state.model)) { state.model = data.model; state.settings = data.settings || {}; }
     for (const [id, list] of Object.entries(data.essays || {})) {
@@ -453,10 +491,23 @@ $("importFile").addEventListener("change", async e => {
     }
     const have = new Set(state.mine.map(m => m.id));
     for (const m of data.mine || []) if (!have.has(m.id)) state.mine.push(m);
-    save(); renderChips(); buildQueue(); next();
-    $("backupStatus").textContent = `已匯入 ${Object.keys(data.progress).length} 張卡的成績。`;
-  } catch (err) { $("backupStatus").textContent = "這個檔案不是滑卡匯出的成績，請重新選擇。"; }
-  e.target.value = "";
+  } catch (err) {
+    load();  // drop the half-merged state; the saved copy was never touched
+    $("backupStatus").textContent = `匯入途中出錯，已放棄這次匯入（${err.message}）。`;
+    return;
+  }
+  if (!save()) return;
+  renderChips(); buildQueue(); next(); showUndo();
+  $("backupStatus").textContent = `已匯入 ${Object.keys(data.progress).length} 張卡的成績。如有問題可按「復原到匯入前」。`;
+});
+$("undoImport").addEventListener("click", () => {
+  try {
+    const snap = localStorage.getItem(snapshotKey());
+    if (!snap) return;
+    localStorage.setItem(D().key, snap); localStorage.removeItem(snapshotKey());
+  } catch (err) { saveError(err); return; }
+  load(); renderChips(); buildQueue(); next(); showUndo();
+  $("backupStatus").textContent = "已復原到上次匯入前的成績。";
 });
 
 function showOnline() { $("offline").textContent = navigator.onLine ? "" : "目前離線：可以照常練習，成績存在手機裡。"; }
@@ -474,7 +525,7 @@ async function openDeck(id) {
   deckId = DECKS[id] ? id : "stats";
   try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
   group = "all"; chapter = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
-  renderDecks(); load();
+  renderDecks(); load(); showUndo();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
     deck = doc.cards || []; scopes = doc.scopes || [];

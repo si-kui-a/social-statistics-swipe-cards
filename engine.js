@@ -113,7 +113,33 @@
     return out;
   }
 
-  const Engine = { LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, level, theta, updateAbility, keywordHit,
+  // Exports carry schemaVersion. 1 (or none): [time, correct, sure] attempts only; 2 adds an essay score
+  // as a fourth attempt field, the ability model, settings and essay text. A file from a newer app is
+  // refused rather than half-read (finance-tools does the same for its workspace files).
+  const EXPORT_VERSION = 2;
+  const bit = x => x === 0 || x === 1;
+  function validAttempt(e) {
+    return Array.isArray(e) && e.length >= 3 && Number.isFinite(e[0]) && bit(e[1]) && bit(e[2]) &&
+      (e.length < 4 || (Number.isFinite(e[3]) && e[3] >= 0 && e[3] <= 1));
+  }
+  // Every problem found, in words for the learner; an empty list means the file can be merged.
+  function validateExport(data) {
+    if (!data || typeof data !== "object" || !data.progress || typeof data.progress !== "object") return ["這不是滑卡匯出的成績檔"];
+    const errs = [];
+    const v = data.schemaVersion;
+    if (v !== undefined && !(Number.isInteger(v) && v >= 1 && v <= EXPORT_VERSION)) {
+      errs.push(`檔案格式 v${v} 比這個 App 支援的 v${EXPORT_VERSION} 新，請重新整理 App 取得新版後再匯入`);
+    }
+    const bad = Object.entries(data.progress).filter(([, p]) =>
+      !p || !Number.isInteger(p.box) || !Number.isFinite(p.due) || !Array.isArray(p.log) || !p.log.every(validAttempt));
+    if (bad.length) errs.push(`${bad.length} 張卡的作答紀錄格式不正確（例如 ${bad[0][0]}）`);
+    if (data.mine !== undefined && !Array.isArray(data.mine)) errs.push("自製卡格式不正確");
+    if (data.essays !== undefined && (typeof data.essays !== "object" || !Object.values(data.essays).every(Array.isArray))) errs.push("申論作答格式不正確");
+    if (data.model !== undefined && (typeof data.model !== "object" || !Object.values(data.model.theta || {}).every(Number.isFinite))) errs.push("能力估計格式不正確");
+    return errs;
+  }
+
+  const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, buildRound, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

@@ -52,5 +52,16 @@ ok("many due reviews hold new cards back", E.adjustVolume({}, log(12, 1), 80, 15
 ok("never below the minimum", E.adjustVolume({ newPerRound: 5 }, log(12, 0), 5, 15).newPerRound === 5);
 ok("essay partial scores count", E.recentScores({ c: { log: [[1, 0, 0, 0.5]] } }, 5)[0] === 0.5);
 
+// import validation: whole file accepted or refused, never half-read
+const good = { schemaVersion: 2, progress: { a: { box: 1, due: 5, log: [[1, 1, 0], [2, 0, 1, 0.5]] } }, mine: [], essays: { a: [] }, model: { theta: { 3: 0.2 } } };
+ok("valid export passes", E.validateExport(good).length === 0);
+ok("old export without version passes", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 1, 0]] } } }).length === 0);
+ok("newer version refused", E.validateExport({ ...good, schemaVersion: 3 }).some(m => m.includes("v3")));
+ok("broken attempt refused", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 2, 0]] } } }).length === 1);
+ok("missing log refused", E.validateExport({ progress: { a: { box: 0, due: 0 } } }).length === 1);
+ok("score above 1 refused", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 1, 0, 1.5]] } } }).length === 1);
+ok("not an export refused", E.validateExport({ hello: 1 }).length === 1 && E.validateExport(null).length === 1);
+ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 3: "x" } } }).length === 1);
+
 console.log(`${fails} failed`);
 process.exit(fails ? 1 : 0);
