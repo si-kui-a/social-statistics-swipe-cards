@@ -1,6 +1,6 @@
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
-const CACHE = "swipe-cards-v1";
+const CACHE = "swipe-cards-v2";
 const FILES = ["./", "index.html", "cards.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
                "icon-512.png", "apple-touch-icon.png"];
 

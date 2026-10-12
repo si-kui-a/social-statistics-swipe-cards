@@ -117,7 +117,7 @@ textarea { min-height: 70px; resize: vertical; }
 <script>
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];  // Leitner box -> days until due after a right answer
 const DAY = 86400000;
-const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "自我檢測", mine: "自製" };
+const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", mine: "自製" };
 const KEY = "swipe-cards-v1";
 
 let deck = [], state = { progress: {}, mine: [] }, queue = [], current = null, flipped = false, sure = 0;
@@ -191,7 +191,7 @@ function render() {
   }
   const c = current, p = state.progress[c.id];
   card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div>
-    <div class="meta"><span>${esc(c.label || c.chapter)}</span><span>${KIND[c.kind] || esc(c.kind)}</span><span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
+    <div class="meta"><span>${esc(c.label || c.chapter)}</span><span>${c.type ? esc(c.type) : KIND[c.kind] || esc(c.kind)}</span><span>${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
     <div class="q">${md(c.q)}</div>
     ${flipped ? `<div class="a"><div class="label">答案</div>${md(c.a)}</div>` : ""}
     <p class="hint">${flipped ? "往右滑＝答對，往左滑＝答錯" : "先答完再翻面"}</p>`;
