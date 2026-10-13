@@ -42,10 +42,63 @@
         if (actions.bottom > W.innerHeight) failures.push(`${where}: buttons end at ${Math.round(actions.bottom)}px, screen is ${W.innerHeight}px`);
         if (work && work.getBoundingClientRect().bottom > W.innerHeight) failures.push(`${where}: answer area below the first screen`);
         if (D.documentElement.scrollWidth > W.innerWidth) failures.push(`${where}: page scrolls sideways (${D.documentElement.scrollWidth}px)`);
+        // With the page locked (overflow hidden) scrollWidth no longer shows a row that is too wide:
+        // check that the menu button and the right-hand action button end inside the screen.
+        for (const el of [D.getElementById("openMenu"), D.querySelector("#actions > :last-child"), D.getElementById("today")]) {
+          if (el && el.getBoundingClientRect().right > W.innerWidth + 1) failures.push(`${where}: #${el.id || el.className} ends past the right edge`);
+        }
         if (meta && meta.scrollHeight > meta.clientHeight + 2) failures.push(`${where}: card tags wrap to a second line`);
         if (phase === "front" && fmt !== "mc" && !work) failures.push(`${where}: no answer area`);
+        // 2026-10-13: the page itself must not scroll; only the card's text does
+        if (D.documentElement.scrollHeight > W.innerHeight + 1) failures.push(`${where}: page scrolls down (${D.documentElement.scrollHeight}px)`);
       }
     }
+    // Swipes: a scroll that the browser takes over ends in pointercancel, often with clientX 0; it
+    // used to read as a long left swipe and skip to the next card while the explanation was read.
+    const mc = longest.mc, P = (type, x, y) => new W.PointerEvent(type, { bubbles: true, pointerId: 1, clientX: x, clientY: y });
+    const body = () => D.querySelector("#card .body");
+    W.eval(`queue = [${JSON.stringify(longest.flip)}]; phase = "result"; picked = "A"; lastScore = 0; current = ${JSON.stringify(mc)}; render();`);
+    body().dispatchEvent(P("pointerdown", 200, 500)); W.dispatchEvent(P("pointermove", 203, 420)); W.dispatchEvent(P("pointercancel", 0, 0));
+    seen.push("swipe/scroll then pointercancel");
+    if (W.eval("current && current.id") !== mc.id) failures.push("a vertical scroll ending in pointercancel moved to the next card");
+    body().dispatchEvent(P("pointerdown", 200, 500)); W.dispatchEvent(P("pointermove", 260, 380)); W.dispatchEvent(P("pointerup", 320, 300));
+    seen.push("swipe/diagonal drag");
+    if (W.eval("current && current.id") !== mc.id) failures.push("a mostly vertical drag counted as a swipe");
+    body().dispatchEvent(P("pointerdown", 100, 500)); W.dispatchEvent(P("pointermove", 130, 502)); W.dispatchEvent(P("pointermove", 250, 505)); W.dispatchEvent(P("pointerup", 250, 505));
+    seen.push("swipe/sideways drag");
+    if (W.eval("current && current.id") === mc.id) failures.push("a clear sideways swipe did not move on");
+    // The end-of-round screen fits too and says how the round went.
+    W.eval(`queue = []; current = null; round = { label: "x", pace: "sched", total: 2, results: [{ id: "a", label: "CH1", right: true, sure: 1 }, { id: "b", label: "CH1", right: false, sure: 1 }], retried: [], ids: [] }; render();`);
+    seen.push("round summary");
+    if (!/1 \/ 2/.test(D.querySelector("#card").textContent)) failures.push("round summary does not show the score");
+    if (D.getElementById("actions").getBoundingClientRect().bottom > W.innerHeight) failures.push("round summary buttons below the screen");
+    // Rounds: switching chapters and back resumes the round; 全部刷完 holds every card of the selection,
+    // and 全部 under 多章混合 is the sum of the chapters picked; undo takes the result back.
+    W.eval(`localStorage.clear(); load(); deckId = "stats";`);
+    const chs = [...new Set(W.eval("deck").map(c => c.chapter))].sort();
+    const [X, Y] = chs, count = k => W.eval("deck").filter(c => c.chapter === k).length;
+    const pick = (fn) => W.eval(`changeSelection(${fn})`);
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; }`);
+    const total1 = W.eval("round.total"), first = W.eval("current.id");
+    W.eval("record(1)");
+    pick(`u => { u.chapters = [${JSON.stringify(Y)}]; }`);
+    pick(`u => { u.chapters = [${JSON.stringify(X)}]; }`);
+    seen.push("rounds/resume after switching chapter");
+    if (W.eval("round.total") !== total1 || W.eval("round.results.length") !== 1 || W.eval("round.results[0].id") !== first)
+      failures.push("switching chapters and back did not resume the round");
+    pick(`u => { u.pace = "all"; }`);
+    seen.push("rounds/full pass");
+    if (W.eval("round.total") !== count(X)) failures.push(`全部刷完 holds ${W.eval("round.total")} cards, chapter has ${count(X)}`);
+    pick(`u => { u.mix = true; u.chapters = [${JSON.stringify(X)}, ${JSON.stringify(Y)}]; }`);
+    seen.push("rounds/mixed chapters");
+    if (W.eval("round.total") !== count(X) + count(Y)) failures.push("多章混合 does not hold both chapters");
+    const before = W.eval("round.results.length"), id = W.eval("current.id");
+    W.eval("record(0)"); W.eval("undoLast()");
+    seen.push("rounds/undo");
+    if (W.eval("round.results.length") !== before || W.eval("current.id") !== id) failures.push("undo did not take the answer back");
+    W.eval("record(1)"); W.eval("renderScores()");
+    seen.push("menu/scores");
+    if (!D.querySelector("#scores table") || !/已作答 1\//.test(D.getElementById("scores").textContent)) failures.push("menu scores do not show this round");
     W.localStorage.clear();
     out.textContent = JSON.stringify({ seen, failures });
   } catch (e) {

@@ -86,6 +86,23 @@ ok("score above 1 refused", E.validateExport({ progress: { a: { box: 0, due: 0, 
 ok("not an export refused", E.validateExport({ hello: 1 }).length === 1 && E.validateExport(null).length === 1);
 ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 3: "x" } } }).length === 1);
 
+// rounds: go through everything, summary, today's numbers, mastery groups
+{
+  const cs = [{ id: "a", ch: 1 }, { id: "b", ch: 1 }, { id: "c", ch: 1 }, { id: "d", ch: 1 }];
+  const st = { progress: { a: { box: 1, due: 5 }, b: { box: 3, due: 50 }, c: { box: 2, due: 20 } }, model: {} };
+  const ids = E.fullPass(cs, st, { now: 10, random: () => 0 }).map(c => c.id).join("");
+  ok("full pass: every card once, due then new then soonest due", ids === "adcb");
+  const s = E.summarize([{ id: "a", label: "CH1", right: true, sure: 1 }, { id: "b", label: "CH1", right: false, sure: 1 },
+                         { id: "c", label: "CH2", right: true, sure: 0 }, { id: "d", label: "CH2", right: false, sure: 0 }]);
+  ok("summary: score and groups", s.n === 4 && s.right === 2 && s.pct === 50 && s.unsureRight === 1 &&
+     s.sureWrong.join() === "b" && s.missed.join() === "b,d" && s.byLabel.map(b => `${b.label}${b.right}/${b.n}`).join() === "CH11/2,CH21/2");
+  ok("summary: empty round", E.summarize([]).pct === 0);
+  const d = E.since({ x: { log: [[5, 1, 1], [15, 1, 1], [16, 0, 1]] }, y: { log: [[20, 1, 0]] } }, 10);
+  ok("today: only attempts since the start", d.n === 3 && d.right === 2 && d.pct === 67);
+  const m = E.mastery(cs, st.progress);
+  ok("mastery groups", m.unseen === 1 && m.learning === 2 && m.mastered === 1);
+}
+
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");

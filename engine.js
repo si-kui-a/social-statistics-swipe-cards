@@ -137,6 +137,52 @@
     return out;
   }
 
+  // Every card in the selection once, for "go through all of it": due reviews first, then unseen cards
+  // nearest TARGET success, then the rest by how soon they fall due. Anki's Custom Study does the same
+  // job (step outside the daily limits); without it a large chapter could never be finished.
+  function fullPass(cards, state, opts) {
+    const r = buildRound(cards, state, { ...opts, cap: Infinity });
+    const progress = state.progress;
+    const later = cards.filter(c => progress[c.id] && progress[c.id].due > opts.now)
+      .sort((a, b) => progress[a.id].due - progress[b.id].due);
+    return r.seen.concat(r.fresh, later);
+  }
+
+  // A finished round in numbers. results hold the first attempt at each card ({ id, label, right, sure });
+  // retries of missed cards do not count, as in Quizlet and Anki, so the score says what was known.
+  function summarize(results) {
+    const n = results.length, right = results.filter(r => r.right).length;
+    const by = new Map();
+    for (const r of results) {
+      const b = by.get(r.label) || { label: r.label, n: 0, right: 0 };
+      b.n++; if (r.right) b.right++;
+      by.set(r.label, b);
+    }
+    return { n, right, pct: n ? Math.round(100 * right / n) : 0,
+             sureWrong: results.filter(r => !r.right && r.sure).map(r => r.id),
+             unsureRight: results.filter(r => r.right && !r.sure).length,
+             missed: results.filter(r => !r.right).map(r => r.id),
+             byLabel: [...by.values()].sort((a, b) => a.label < b.label ? -1 : 1) };
+  }
+
+  // Attempts since a moment (the start of today), over the whole deck: the same whatever chapter is
+  // picked, unlike the round counts.
+  function since(progress, from) {
+    let n = 0, right = 0;
+    for (const p of Object.values(progress)) for (const e of p.log || []) if (e[0] >= from) { n++; right += e[1]; }
+    return { n, right, pct: n ? Math.round(100 * right / n) : 0 };
+  }
+
+  // Quizlet-style groups: never answered, still learning (box 0-2: due within 3 days), mastered (box 3+).
+  function mastery(cards, progress) {
+    const out = { unseen: 0, learning: 0, mastered: 0 };
+    for (const c of cards) {
+      const p = progress[c.id];
+      out[!p ? "unseen" : p.box >= 3 ? "mastered" : "learning"]++;
+    }
+    return out;
+  }
+
   // Exports carry schemaVersion. 1 (or none): [time, correct, sure] attempts only; 2 adds an essay score
   // as a fourth attempt field, the ability model, settings and essay text. A file from a newer app is
   // refused rather than half-read (finance-tools does the same for its workspace files).
@@ -164,6 +210,6 @@
   }
 
   const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, summarize, since, mastery, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
