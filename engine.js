@@ -168,11 +168,12 @@
       .sort((a, b) => (b.n - b.right) / b.n - (a.n - a.right) / a.n || b.n - a.n);
     const count = key => results.filter(r => !r.right && r[key]).reduce((m, r) => (m[r[key]] = (m[r[key]] || 0) + 1, m), {});
     const byLabel = group("label");
+    const bySection = group("section");
     return { n, right, pct: n ? Math.round(100 * right / n) : 0,
              sureWrong: results.filter(r => !r.right && r.sure).map(r => r.id),
              unsureRight: results.filter(r => r.right && !r.sure).length,
              missed: results.filter(r => !r.right).map(r => r.id),
-             byLabel: byLabel.sort((a, b) => a.label < b.label ? -1 : 1),
+             byLabel: byLabel.sort((a, b) => a.label < b.label ? -1 : 1), bySection,
              weakLabels: weak(byLabel), weakTypes: weak(group("type")), diags: count("diag"), traps: count("trap") };
   }
 
@@ -239,6 +240,24 @@
     return sure ? "sure" : "flip";
   }
 
+  // A mock exam from its spec in the deck file (exams[]): scope by course chapter (ch) or chapter-code
+  // prefixes (chapters), then each section's n cards of the given formats, in section order as on a real
+  // paper. Returns ids, each id's section, and the sections that came up short (too few cards yet).
+  function buildExam(cards, exam, rnd = Math.random) {
+    const sc = exam.scope || {};
+    const under = (c, prefixes) => prefixes.some(p => String(c.chapter).startsWith(p));
+    const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters)));
+    const used = new Set(), ids = [], section = {}, short = [];
+    for (const s of exam.sections) {
+      const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters)));
+      for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+      const take = cand.slice(0, s.n);
+      for (const c of take) { used.add(c.id); ids.push(c.id); section[c.id] = s.name; }
+      if (take.length < s.n) short.push(`${s.name} ${take.length}/${s.n}`);
+    }
+    return { ids, section, short };
+  }
+
   // Quizlet-style groups: never answered, still learning (box 0-2: due within 3 days), mastered (box 3+).
   function mastery(cards, progress) {
     const out = { unseen: 0, learning: 0, mastered: 0 };
@@ -290,6 +309,6 @@
   }
 
   const Engine = { EXPORT_VERSION, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
