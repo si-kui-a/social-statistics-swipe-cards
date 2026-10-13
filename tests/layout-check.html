@@ -96,6 +96,32 @@
     W.eval("record(0)"); W.eval("undoLast()");
     seen.push("rounds/undo");
     if (W.eval("round.results.length") !== before || W.eval("current.id") !== id) failures.push("undo did not take the answer back");
+    // Mechanical stops (2026-10-13: "本輪 24/24・✓10 ✗14／今天 40 題 48%" and cards kept coming).
+    W.eval(`window.ans = ok => { record(ok ? 1 : 0); if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+      current = null; next(); }; localStorage.clear(); load();`);
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
+    const total = W.eval("round.total");
+    for (let i = 0; i < total; i++) W.eval("sure = 0; ans(false)");  // unsure misses go to the end of the round
+    seen.push("stop/round ends after every first attempt");
+    if (W.eval("current") !== null || !W.eval("round.done")) failures.push(`after ${total}/${total} first attempts the round went on with retries`);
+    if (!/繼續複習答錯的（/.test(D.getElementById("actions").textContent)) failures.push("round end offers no 繼續複習答錯的");
+    if (!/易錯領域|錯在哪裡/.test(D.querySelector("#card").textContent)) failures.push("round end shows no analysis");
+    seen.push("stop/today counts cards, not retries");
+    if (!new RegExp(`今天 ${total}/300 張`).test(D.getElementById("today").textContent)) failures.push(`today line: ${D.getElementById("today").textContent}`);
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "all"; u.chapters = [${JSON.stringify(X)}, ${JSON.stringify(Y)}]; u.mix = true; u.dailyMax = 10; }`);
+    for (let i = 0; i < 10; i++) W.eval("ans(true)");
+    seen.push("stop/daily limit pauses");
+    if (W.eval("typeof paused !== \"undefined\" && paused && paused.code") !== "limit" || W.eval("current") !== null) failures.push("no pause at the daily limit");
+    W.eval(`(document.getElementById("goOn") || { click() {} }).click()`);
+    if (W.eval("typeof paused === \"undefined\" ? 1 : paused") !== null || W.eval("current") === null) failures.push("再做 20 張 did not continue");
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.dailyMax = 300; }`);
+    for (let i = 0; i < 20; i++) W.eval("sure = 1; ans(false)");
+    seen.push("stop/a run of misses pauses");
+    if (W.eval("typeof paused !== \"undefined\" && paused && paused.code") !== "low") failures.push("no pause after 20 misses in a row");
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; }`);
     W.eval("record(1)"); W.eval("renderScores()");
     seen.push("menu/scores");
     if (!D.querySelector("#scores table") || !/已作答 1\//.test(D.getElementById("scores").textContent)) failures.push("menu scores do not show this round");

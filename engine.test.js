@@ -98,7 +98,31 @@ ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 
      s.sureWrong.join() === "b" && s.missed.join() === "b,d" && s.byLabel.map(b => `${b.label}${b.right}/${b.n}`).join() === "CH11/2,CH21/2");
   ok("summary: empty round", E.summarize([]).pct === 0);
   const d = E.since({ x: { log: [[5, 1, 1], [15, 1, 1], [16, 0, 1]] }, y: { log: [[20, 1, 0]] } }, 10);
-  ok("today: only attempts since the start", d.n === 3 && d.right === 2 && d.pct === 67);
+  // a retry of a missed card is not a second card, and the rate is first attempts only (2026-10-13)
+  ok("today: distinct cards, first attempt", d.n === 2 && d.right === 2 && d.pct === 100 && d.attempts === 3);
+  const many = {};
+  for (let i = 0; i < 24; i++) many["c" + i] = { log: [[100 + i, i < 10 ? 1 : 0, 1]] };
+  const t = E.since(many, 0);
+  ok("today: 24 cards, recent 20 at 30%", t.n === 24 && t.recentN === 20 && t.recentPct === 30);
+  ok("pause: low accuracy", E.pauseReason(t, null, 60).code === "low");
+  ok("pause: not again right after it was acknowledged", E.pauseReason(t, { at: 24 }, 60) === null);
+  ok("pause: daily limit", E.pauseReason({ ...t, recentPct: 90 }, null, 24).code === "limit");
+  ok("pause: limit raised by the learner", E.pauseReason({ ...t, recentPct: 90 }, { limit: 44 }, 24) === null);
+  ok("pause: none on a good day", E.pauseReason({ n: 10, attempts: 10, recentN: 10, recentPct: 40 }, null, 60) === null);
+  const numCard = { format: "num", num: { value: 0.23 } };
+  ok("diagnose: percent for proportion", E.diagnose(numCard, "23", false, 1) === "pct");
+  ok("diagnose: sign", E.diagnose({ format: "num", num: { value: -1.5 } }, "1.5", false, 1) === "sign");
+  ok("diagnose: rounding", E.diagnose({ format: "num", num: { value: 2.138 } }, "2.1", false, 1) === "round");
+  ok("diagnose: other numbers", E.diagnose(numCard, "0.5", false, 1) === "calc");
+  ok("diagnose: tagged trap", E.diagnose({ format: "mc", traps: { B: "S06" } }, "B", false, 0) === "trap");
+  ok("diagnose: confident miss", E.diagnose({ format: "mc" }, "C", false, 1) === "sure");
+  ok("diagnose: right answers have none", E.diagnose(numCard, "0.23", true, 1) === null);
+  ok("diagnose: every code has a question", Object.values(E.DIAG).every(x => x.name && /？|。$/.test(x.ask)));
+  const w = E.summarize([{ id: 1, label: "CH3", type: "找錯", right: false, sure: 1, diag: "sure" },
+                         { id: 2, label: "CH3", type: "找錯", right: false, sure: 0, diag: "pct", trap: "S01" },
+                         { id: 3, label: "CH4", type: "定義辨識", right: true, sure: 1 }]);
+  ok("summary: weak areas and diagnoses", w.weakLabels[0].label === "CH3" && w.weakTypes[0].label === "找錯" &&
+     w.diags.sure === 1 && w.diags.pct === 1 && w.traps.S01 === 1 && w.weakLabels.length === 1);
   const m = E.mastery(cs, st.progress);
   ok("mastery groups", m.unseen === 1 && m.learning === 2 && m.mastered === 1);
 }
