@@ -150,27 +150,93 @@
 
   // A finished round in numbers. results hold the first attempt at each card ({ id, label, right, sure });
   // retries of missed cards do not count, as in Quizlet and Anki, so the score says what was known.
+  // Results may also carry type (定義辨識, 國考選擇題…), diag (diagnose()) and trap (a misconception id);
+  // weak areas are labels and types with two or more misses, worst share first.
   function summarize(results) {
     const n = results.length, right = results.filter(r => r.right).length;
-    const by = new Map();
-    for (const r of results) {
-      const b = by.get(r.label) || { label: r.label, n: 0, right: 0 };
-      b.n++; if (r.right) b.right++;
-      by.set(r.label, b);
-    }
+    const group = key => {
+      const by = new Map();
+      for (const r of results) {
+        const k = r[key]; if (!k) continue;
+        const b = by.get(k) || { label: k, n: 0, right: 0 };
+        b.n++; if (r.right) b.right++;
+        by.set(k, b);
+      }
+      return [...by.values()];
+    };
+    const weak = list => list.filter(b => b.n - b.right >= 2)
+      .sort((a, b) => (b.n - b.right) / b.n - (a.n - a.right) / a.n || b.n - a.n);
+    const count = key => results.filter(r => !r.right && r[key]).reduce((m, r) => (m[r[key]] = (m[r[key]] || 0) + 1, m), {});
+    const byLabel = group("label");
     return { n, right, pct: n ? Math.round(100 * right / n) : 0,
              sureWrong: results.filter(r => !r.right && r.sure).map(r => r.id),
              unsureRight: results.filter(r => r.right && !r.sure).length,
              missed: results.filter(r => !r.right).map(r => r.id),
-             byLabel: [...by.values()].sort((a, b) => a.label < b.label ? -1 : 1) };
+             byLabel: byLabel.sort((a, b) => a.label < b.label ? -1 : 1),
+             weakLabels: weak(byLabel), weakTypes: weak(group("type")), diags: count("diag"), traps: count("trap") };
   }
 
-  // Attempts since a moment (the start of today), over the whole deck: the same whatever chapter is
-  // picked, unlike the round counts.
+  // Today, over the whole deck (the same whatever chapter is picked): distinct cards and how many were
+  // right at their first attempt today. Counting every attempt let retries of missed cards inflate
+  // "今天 40 題" and blur the rate (2026-10-13). recent: the last RECENT_TODAY attempts, for pauseReason.
+  const RECENT_TODAY = 20;
   function since(progress, from) {
-    let n = 0, right = 0;
-    for (const p of Object.values(progress)) for (const e of p.log || []) if (e[0] >= from) { n++; right += e[1]; }
-    return { n, right, pct: n ? Math.round(100 * right / n) : 0 };
+    let cards = 0, first = 0;
+    const today = [];
+    for (const p of Object.values(progress)) {
+      const log = (p.log || []).filter(e => e[0] >= from);
+      if (!log.length) continue;
+      cards++; first += log[0][1];
+      today.push(...log);
+    }
+    const recent = today.sort((a, b) => a[0] - b[0]).slice(-RECENT_TODAY);
+    return { n: cards, right: first, pct: cards ? Math.round(100 * first / cards) : 0, attempts: today.length,
+             recentN: recent.length, recentPct: recent.length ? Math.round(100 * recent.reduce((s, e) => s + e[1], 0) / recent.length) : 0 };
+  }
+
+  // A mechanical stop (Anki's daily limit, plus a fatigue check): the daily card limit, or the last
+  // RECENT_TODAY attempts under half right. ack remembers what the learner already chose to go past:
+  // { day, limit, at } with at = the attempt count when the low-accuracy pause was last shown.
+  const DAILY_MAX = 60, LOW_TODAY = 50, EXTRA = 20;
+  function pauseReason(today, ack, dailyMax) {
+    const limit = (ack && ack.limit) || dailyMax || DAILY_MAX;
+    if (today.n >= limit) return { code: "limit", limit, text: `今天已做 ${today.n} 張，到了每日上限 ${limit} 張` };
+    const since_ack = today.attempts - ((ack && ack.at) || 0);
+    if (today.recentN >= RECENT_TODAY && today.recentPct < LOW_TODAY && since_ack >= RECENT_TODAY) {
+      return { code: "low", text: `最近 ${RECENT_TODAY} 題只答對 ${today.recentPct}%：先看錯在哪，比再多做有用` };
+    }
+    return null;
+  }
+
+  // Why a wrong answer went wrong, from the answer itself where the format allows, each with the first
+  // step of a hint ladder: ask before telling, the rule the essay review uses, carried over to the other
+  // formats. A multiple-choice pick tagged as a known misconception (card.traps) names it instead.
+  const DIAG = {
+    pct: { name: "百分比與比例混用", ask: "題目要的是比例（0 到 1）還是百分比（0 到 100）？" },
+    sign: { name: "正負號弄反", ask: "這個量應該是正還是負？是誰減誰？" },
+    round: { name: "四捨五入太早或精度不足", ask: "中間步驟留了幾位小數？最後才四捨五入會差多少？" },
+    calc: { name: "公式或步驟錯", ask: "先說這個公式在解決什麼問題，再逐步代數字：哪一步和解說不同？" },
+    trap: { name: "選了常見誤解", ask: "這個選項看起來對的理由是什麼？那個理由在哪裡不成立？" },
+    sure: { name: "以為懂（有把握卻答錯）", ask: "你當時用什麼判斷？那個判斷在什麼情況下不成立？" },
+    choice: { name: "選擇題選錯", ask: "每個選項各錯在哪裡？試著一句話說出它不成立的理由。" },
+    essay: { name: "申論要點沒寫到", ask: "漏掉的是定義、條件還是例子？下次先列這三樣再寫。" },
+    flip: { name: "自評答錯", ask: "寫一句「因為……」：你的答案和解說差在哪個判斷？" },
+  };
+  function diagnose(card, answer, right, sure) {
+    if (right) return null;
+    if (card.format === "num" && card.num) {
+      let x = parseNumber(answer);
+      if (card.num.unit === "%" && /%\s*$/.test(String(answer))) x *= 100;
+      const v = card.num.value, near = (a, b) => Math.abs(a - b) <= Math.abs(b) * 0.01;
+      if (!Number.isFinite(x) || v === 0) return "calc";
+      if (near(x, v * 100) || near(x, v / 100)) return "pct";
+      if (near(x, -v)) return "sign";
+      if (Math.abs(x - v) <= Math.abs(v) * 0.05) return "round";
+      return "calc";
+    }
+    if (card.format === "mc") return card.traps && card.traps[answer] ? "trap" : sure ? "sure" : "choice";
+    if (card.format === "essay") return "essay";
+    return sure ? "sure" : "flip";
   }
 
   // Quizlet-style groups: never answered, still learning (box 0-2: due within 3 days), mastered (box 3+).
@@ -224,6 +290,6 @@
   }
 
   const Engine = { EXPORT_VERSION, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, summarize, since, mastery, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
