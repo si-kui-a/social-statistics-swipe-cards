@@ -120,7 +120,28 @@
     for (let i = 0; i < 20; i++) W.eval("sure = 1; ans(false)");
     seen.push("stop/a run of misses pauses");
     if (W.eval("typeof paused !== \"undefined\" && paused && paused.code") !== "low") failures.push("no pause after 20 misses in a row");
+    // Mock exam: no right/wrong shown while it runs, written answers graded after hand-in, score by
+    // section at the end, and time-up hands the paper in.
     W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "exam"; u.exam = "mid-mini"; }`);
+    seen.push("exam/runs without feedback");
+    const n = W.eval("round.total");
+    let shown = 0;
+    for (let i = 0; i < n * 2 && W.eval("current && !round.exam.grading"); i++) {
+      W.eval(`(() => { const f = format(current); if (f === "mc") picked = current.choices[0][0]; else typed = "1"; submit(true); })()`);
+      if (W.eval("phase") === "result") shown++;
+    }
+    if (shown) failures.push(`an answer was marked right/wrong during the exam (${shown} times)`);
+    if (!/批改簡答/.test(D.getElementById("roundText").textContent)) failures.push("written answers were not graded after the paper");
+    for (let i = 0; i < n && W.eval("current"); i++) W.eval("record(1)");
+    seen.push("exam/score by section");
+    if (!W.eval("round.done") || !/大題/.test(D.querySelector("#card").textContent)) failures.push("no exam summary with sections");
+    if (!/再考一次/.test(D.getElementById("actions").textContent)) failures.push("exam end offers no 再考一次");
+    W.eval(`document.getElementById("again").click()`);
+    W.eval("round.exam.ends = Date.now() - 1; examTick()");
+    seen.push("exam/time-up hands in");
+    if (!W.eval("round.exam.timeUp") || W.eval("current && !round.exam.grading")) failures.push("time-up did not hand the paper in");
+    W.eval("clearInterval(examTicker); localStorage.clear(); load();");
     pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; }`);
     W.eval("record(1)"); W.eval("renderScores()");
     seen.push("menu/scores");

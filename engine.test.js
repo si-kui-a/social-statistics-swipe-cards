@@ -136,6 +136,22 @@ ok("export v3: answer field accepted", E.validateExport({ schemaVersion: 3, prog
 ok("export: an answer that is not text is refused", E.validateExport({ schemaVersion: 3, progress: { a: { box: 0, due: 0, log: [[1, 0, 1, 0, 3]] } } }).length === 1);
 ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progress: { a: { box: 0, due: 0, log: [[1, 1, 1]] } } }).length === 0);
 
+// mock exams: scope, sections in order, formats, no card twice, shortfalls reported
+{
+  const pool = [{ id: "m1", ch: 2, format: "mc" }, { id: "m2", ch: 3, format: "mc" }, { id: "m3", ch: 6, format: "mc" },
+                { id: "n1", ch: 2, format: "num" }, { id: "f1", ch: 4 }, { id: "x1", chapter: "4T1", format: "num" }];
+  const spec = { scope: { ch: [1, 2, 3, 4] }, sections: [{ name: "選擇", n: 2, formats: ["mc"] }, { name: "計算", n: 2, formats: ["num"] },
+                                                          { name: "簡答", n: 1, formats: ["flip", "essay"] }] };
+  const ex = E.buildExam(pool, spec, () => 0);
+  ok("exam: scope and formats", ex.ids.length === 4 && !ex.ids.includes("m3") && !ex.ids.includes("x1"));
+  ok("exam: section order", ex.section[ex.ids[0]] === "選擇" && ex.section[ex.ids[2]] === "計算" && ex.section[ex.ids[3]] === "簡答");
+  ok("exam: shortfall reported", ex.short.join() === "計算 1/2");
+  const byPrefix = E.buildExam(pool, { scope: { chapters: ["4T"] }, sections: [{ name: "判讀", n: 3, formats: ["num"] }] }, () => 0);
+  ok("exam: chapter-code scope", byPrefix.ids.join() === "x1");
+  const s = E.summarize([{ id: 1, section: "選擇", right: true }, { id: 2, section: "選擇", right: false }, { id: 3, section: "計算", right: true }]);
+  ok("exam: score by section", s.bySection.map(b => `${b.label}${b.right}/${b.n}`).join() === "選擇1/2,計算1/1");
+}
+
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");

@@ -129,7 +129,7 @@ table.t td.n, table.t th.n { text-align: right; }
   </header>
   <div class="modes">
     <div class="seg" id="pace" role="group" aria-label="每輪份量">
-      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button>
+      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button>
     </div>
     <div class="seg" id="mix" role="group" aria-label="章節選法">
       <button type="button" data-mix="0">單章</button><button type="button" data-mix="1">多章混合</button>
@@ -169,6 +169,7 @@ table.t td.n, table.t th.n { text-align: right; }
         <p class="small"><b>排程複習</b>：每輪只出到期的複習卡加上適量新卡，答對的卡依 1、3、7、14、30 天再出現；適合每天練一點。<b>全部刷完</b>：所選範圍每張卡各出一次，可以一路滑到底，中途離開下次接著做。</p>
         <p class="small"><b>單章</b>：點一個章節只練那一章。<b>多章混合</b>：可點選多個章節一起練，「全部」就是範圍內所有章節混在一起。每個選法各自記住進度，切換章節再回來會接著原本那一輪。</p>
         <p class="small"><b>上方數字</b>：「本輪 7/20」是這一輪已作答／總張數，只算第一次作答；「今天 32/60 張・首答 48%」是今天做過的不同卡片數／每日上限，以及每張卡今天第一次作答的答對率，不受章節切換影響。選「有把握」卻答錯的，隔 3 張就再出現一次。</p>
+        <p class="small"><b>模擬考</b>：選「模擬考」再選一份考卷，照大題順序作答、有時間限制，作答中不顯示對錯；簡答在交卷後自己批改，申論依關鍵字評分。時間到自動交卷，結束後看各大題得分與分析，可以「檢討答錯的」或「再考一次」。考卷配置依課綱與作業推估。</p>
         <p class="small"><b>自動停下</b>：每張卡都答過一次，這一輪就結束，顯示得分與分析，再由你選「繼續複習答錯的」或「再練一輪」。今天做到每日上限（☰ → 每日上限），或最近 20 題答對不到一半，也會先停下，可以選再做 20 張或今天到此為止。</p>
         <p class="small"><b>分析</b>：列出易錯的章節與題型、錯在哪裡（例如計算題把比例寫成百分比、選擇題選了常見誤解、有把握卻答錯），每一項附一個「先想」的問題：先自己想，再看解說。</p>
       </div>
@@ -224,6 +225,8 @@ let paused = null;
 // Misconception types the course repository exports with the cards (cards.json "misconceptions"):
 // a pick tagged in card.traps is named in the round analysis with what to do about it.
 let misconceptions = {};
+// Mock exams from the deck file (exams[]): fixed sections, a time limit, no feedback until the end.
+let exams = [], examTicker = null;
 // phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
@@ -290,7 +293,9 @@ function ui() {
   return state.ui;
 }
 // Filters, outermost first: exam scope (期中／期末, by course chapter), group (量化／質性／通論), chapters.
-function inScope(c) { const u = ui(), s = scopes.find(x => x.id === u.scope); return u.scope === "all" || (!!s && s.ch.includes(c.ch)); }
+// A scope lists course chapters (ch, statistics) or chapter-code prefixes (chapters, research methods).
+function scopeHas(s, c) { return s.ch ? s.ch.includes(c.ch) : (s.chapters || []).some(p => String(c.chapter).startsWith(p)); }
+function inScope(c) { const u = ui(), s = scopes.find(x => x.id === u.scope); return u.scope === "all" || (!!s && scopeHas(s, c)); }
 function inGroup(c) { return inScope(c) && (ui().group === "all" || c.group === ui().group); }
 function inSelection(c) { const ch = ui().chapters; return inGroup(c) && (!ch.length || ch.includes(c.chapter)); }
 function selectionLabel() {
@@ -315,8 +320,18 @@ function dayStart(t = Date.now()) { const d = new Date(t); d.setHours(0, 0, 0, 0
 // ignoreDue: the scheduled pace with every seen card, for a second round on the same day.
 function newRound(opts = {}) {
   const now = Date.now(), cards = allCards().filter(inSelection), pace = ui().pace;
-  let list, review = 0;
+  let list, review = 0, exam, label = selectionLabel();
   if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
+  else if (pace === "exam") {
+    const spec = exams.find(e => e.id === ui().exam) || exams[0];
+    const b = spec ? Engine.buildExam(allCards(), spec) : { ids: [], section: {}, short: [] };
+    list = b.ids.map(byId).filter(Boolean);
+    if (spec) {
+      label = spec.title;
+      exam = { id: spec.id, title: spec.title, minutes: spec.minutes, ends: now + spec.minutes * 60000, section: b.section,
+               short: b.short, note: spec.note || "", pending: [], grading: false, timeUp: false };
+    }
+  }
   else if (pace === "all") list = Engine.fullPass(cards, state, { now });
   else {
     state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
@@ -324,11 +339,14 @@ function newRound(opts = {}) {
     review = r.seen.length;
     list = shuffle(r.seen.concat(r.fresh));
   }
-  return { pace, label: selectionLabel(), started: now, total: list.length, review, ids: list.map(c => c.id),
-           current: null, results: [], retried: [], done: false, retry: !!opts.ids };
+  return { pace, label, started: now, total: list.length, review, ids: list.map(c => c.id),
+           current: null, results: [], retried: [], done: false, retry: !!opts.ids, exam };
 }
 
-function selectionKey() { const u = ui(); return [u.pace, u.scope, u.group, [...u.chapters].sort().join(",")].join("|"); }
+function selectionKey() {
+  const u = ui();
+  return u.pace === "exam" ? `exam|${u.exam || ""}` : [u.pace, u.scope, u.group, [...u.chapters].sort().join(",")].join("|");
+}
 // Resume the selection's round when there is one: a scheduled round only on the day it was drawn (the
 // next day other cards are due), a full pass until it is finished, so a long chapter can take days.
 function openRound(fresh) {
@@ -353,6 +371,7 @@ function openRound(fresh) {
   undo = null; showUndoButton();
   phase = "front"; picked = null; typed = ""; ticks = [];
   if (current && d && d.id === current.id) { typed = d.typed || ""; picked = d.picked || null; }
+  startExamClock();
   if (!current) return next();
   save(); render();
 }
@@ -366,8 +385,15 @@ function renderChips() {
   const cards = allCards(), u = ui();
   document.querySelectorAll("#pace button").forEach(b => b.setAttribute("aria-pressed", b.dataset.pace === u.pace));
   document.querySelectorAll("#mix button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mix === (u.mix ? "1" : "0")));
+  $("mix").hidden = u.pace === "exam";
+  if (u.pace === "exam") {  // the chapter row lists the exams instead; each exam fixes its own scope
+    $("scopes").hidden = true;
+    const pickedExam = u.exam || (exams[0] || {}).id;
+    chipRow($("chips"), exams.map(e => [e.id, `${e.title}（${e.minutes} 分）`, e.sections.reduce((a, s) => a + s.n, 0)]), k => k === pickedExam, "ex");
+    if (!exams.length) $("chips").innerHTML = `<span class="small">這個題庫還沒有模擬考</span>`;
+  } else {
   const outer = scopes.length
-    ? [["s:all", "全部範圍", cards.length], ...scopes.map(s => [`s:${s.id}`, s.title, cards.filter(c => s.ch.includes(c.ch)).length])]
+    ? [["s:all", "全部範圍", cards.length], ...scopes.map(s => [`s:${s.id}`, s.title, cards.filter(c => scopeHas(s, c)).length])]
     : [];
   const inS = cards.filter(inScope);
   const groups = [...new Set([...inS].sort((a, b) => a.chapter < b.chapter ? -1 : 1).filter(c => c.group).map(c => c.group))];
@@ -381,6 +407,7 @@ function renderChips() {
   chipRow($("chips"), [["all", u.group === "all" ? "全部" : `全部${u.group}`, inG.length],
     ...chapters.map(([k, l]) => [k, short(l), inG.filter(c => c.chapter === k).length])],
     k => k === "all" ? !u.chapters.length : u.chapters.includes(k), "ch");
+  }
   const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
   $("addChapter").innerHTML = all.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
 }
@@ -390,6 +417,13 @@ function renderChips() {
 function renderProgress() {
   const done = round ? round.results.length : 0, total = round ? Math.max(round.total, done) : 0;
   const right = round ? round.results.filter(r => r.right).length : 0;
+  const ex = round && round.exam;
+  if (ex && !round.done) {  // no right/wrong while the exam runs
+    const left = Math.max(0, ex.ends - Date.now()), mm = Math.floor(left / 60000), ss = String(Math.floor(left / 1000) % 60).padStart(2, "0");
+    const answered = done + (ex.grading ? 0 : ex.pending.length);
+    $("roundText").textContent = ex.grading ? `${ex.title}・批改簡答 ${done}/${total}` : `${ex.title}・${answered}/${total}・剩 ${mm}:${ss}`;
+    $("barFill").style.width = `${total ? Math.round(100 * answered / total) : 0}%`;
+  } else
   $("roundText").textContent = total ? `本輪 ${done}/${total}・✓${right} ✗${done - right}` : "本輪沒有卡";
   $("barFill").style.width = `${total ? Math.round(100 * done / total) : 0}%`;
   const t = Engine.since(state.progress, dayStart());
@@ -402,8 +436,8 @@ function setActions() {
   $("actions").innerHTML =
     paused ? `<button class="big" id="stopToday" type="button">今天到此為止</button><button class="big sure" id="goOn" type="button">${paused.code === "limit" ? `再做 ${Engine.EXTRA} 張` : "看完了，繼續"}</button>` :
     !current ? (!deck.length ? "" :
-      `<button class="big" id="retryMissed" type="button" ${missed ? "" : "disabled"}>繼續複習答錯的（${missed}）</button>` +
-      `<button class="big sure" id="again" type="button">${ui().pace === "all" ? "從頭再刷一次" : "再練一輪（含未到期）"}</button>`) :
+      `<button class="big" id="retryMissed" type="button" ${missed ? "" : "disabled"}>${round && round.exam ? "檢討答錯的" : "繼續複習答錯的"}（${missed}）</button>` +
+      `<button class="big sure" id="again" type="button">${round && round.exam ? "再考一次" : ui().pace === "all" ? "從頭再刷一次" : "再練一輪（含未到期）"}</button>`) :
     phase === "front" ? `<button class="big" id="unsure" type="button">${f === "flip" ? "翻面" : "送出"}：不確定</button><button class="big sure" id="sure" type="button">${f === "flip" ? "翻面" : "送出"}：有把握</button>` :
     phase === "back" ? `<button class="big wrong" id="bad" type="button">← 答錯</button><button class="big right" id="good" type="button">答對 →</button>` :
     phase === "rubric" ? `<span></span><button class="big sure" id="score" type="button">完成評分</button>` :
@@ -464,7 +498,23 @@ function pauseHtml(r) {
     <p class="hint">分開幾天練，比一次做很多張記得久；答錯很多時，先弄懂上面的問題再繼續。</p>`;
 }
 
+// A finished mock exam: score, score by section, time used, what the paper could not fill yet.
+function examSummaryHtml(r) {
+  const s = Engine.summarize(r.results), ex = r.exam;
+  const used = Math.min(ex.minutes, Math.ceil(((r.ended || Date.now()) - r.started) / 60000));
+  const rows = s.bySection.map(b => `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${Math.round(100 * b.right / b.n)}%</td></tr>`).join("");
+  const unanswered = r.total - s.n;
+  return `<div class="meta"><span>模擬考結束</span><span>${esc(ex.title)}</span></div>
+    <div class="score">${s.right} / ${r.total}　<span class="result ${s.right / Math.max(1, r.total) >= 0.6 ? "ok" : "bad"}">${Math.round(100 * s.right / Math.max(1, r.total))} 分</span></div>
+    <p class="small">用了 ${used} / ${ex.minutes} 分鐘${ex.timeUp ? "（時間到自動交卷）" : ""}${unanswered ? `・未作答 ${unanswered} 題` : ""}</p>
+    ${rows ? `<table class="t"><tr><th>大題</th><th class="n">答對</th><th class="n">得分</th></tr>${rows}</table>` : ""}
+    ${analysisHtml(r)}
+    ${ex.short.length ? `<p class="small">題目還不夠的大題：${esc(ex.short.join("、"))}（講義與題庫補齊後會自動加入）</p>` : ""}
+    ${ex.note ? `<p class="hint">${esc(ex.note)}</p>` : ""}`;
+}
+
 function summaryHtml(r) {
+  if (r.exam) return examSummaryHtml(r);
   const s = Engine.summarize(r.results);
   const rows = s.byLabel.map(b => `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${Math.round(100 * b.right / b.n)}%</td></tr>`).join("");
   const left = r.pace === "all" ? "" : `<p class="small">明天再回來：分開幾天複習，比一次做很多張記得久。</p>`;
@@ -509,12 +559,28 @@ function render() {
   setActions();
 }
 
+// The exam clock: the progress line counts down each second; at the limit the paper is handed in,
+// unanswered cards stay unanswered and written answers go to grading.
+function startExamClock() {
+  clearInterval(examTicker);
+  if (round && round.exam && !round.done) examTicker = setInterval(examTick, 1000);
+}
+function examTick() {
+  if (!round || !round.exam || round.done) return clearInterval(examTicker);
+  if (Date.now() < round.exam.ends || round.exam.timeUp || round.exam.grading) return renderProgress();  // grading is after hand-in
+  round.exam.timeUp = true;
+  queue = []; current = null;
+  next();
+}
+
 // The end of a round is written to the history once, with what the summary screen shows.
 function finishRound() {
   if (!round || round.done || !round.results.length) return;
   round.done = true;
   const s = Engine.summarize(round.results);
-  state.history = [...state.history, { t: Date.now(), label: round.label, pace: round.pace, retry: round.retry, n: s.n, right: s.right,
+  round.ended = Date.now();
+  clearInterval(examTicker);
+  state.history = [...state.history, { t: Date.now(), label: round.label, pace: round.pace, retry: round.retry, exam: !!round.exam, n: s.n, right: s.right,
                                         sureWrong: s.sureWrong.length }].slice(-KEEP_HISTORY);
 }
 
@@ -530,6 +596,14 @@ function ack() {
 // the daily limit or after a run of misses.
 function next() {
   phase = "front"; picked = null; typed = ""; ticks = [];
+  if (round && round.exam && !round.done) {  // exams: no pauses, no retries; written answers graded at the end
+    const ex = round.exam;
+    if (!queue.length && ex.pending.length && !ex.grading) { ex.grading = true; queue = ex.pending.map(p => byId(p.id)).filter(Boolean); }
+    current = queue.shift() || null;
+    if (current && ex.grading) { const p = ex.pending.find(x => x.id === current.id); phase = "back"; typed = p ? p.typed : ""; }
+    if (!current) finishRound();
+    save(); return render();
+  }
   if (round && !round.done && round.results.length && round.results.length >= round.total) {
     queue = []; current = null; finishRound(); save(); return render();
   }
@@ -545,6 +619,11 @@ function next() {
 function submit(isSure) {
   const c = current, f = format(c);
   sure = isSure ? 1 : 0;
+  if (round && round.exam && !round.exam.grading && !round.done) {
+    // a written answer is graded by the learner after the paper, like handing it in first
+    if (f === "flip") { round.exam.pending.push({ id: c.id, typed }); clearDraft(); current = null; return next(); }
+    if (f === "essay") { ticks = Engine.matchPoints(c, typed); return record(Engine.grade(c, ticks)); }
+  }
   if (f === "flip") { phase = "back"; return render(); }
   if (f === "mc" && !picked) { $("card").querySelector(".hint").textContent = "先點選一個答案"; return; }
   if (f === "num" && !typed.trim()) { $("card").querySelector(".hint").textContent = "先輸入答案"; return; }
@@ -567,14 +646,16 @@ function record(score) {
   if (round && !round.results.some(r => r.id === c.id)) {
     const given = f === "mc" ? picked : f === "num" ? typed : "";
     round.results.push({ id: c.id, label: c.label || c.chapter, type: c.type || KIND[c.kind] || "", right, sure,
+                         section: round.exam ? round.exam.section[c.id] : undefined,
                          diag: Engine.diagnose({ ...c, format: f }, given, right, sure),
                          trap: !right && f === "mc" && c.traps ? c.traps[picked] || null : null });
   }
   // Flip cards keep what was written too, when anything was (no rubric, so ticks stays empty).
   if (format(c) === "essay" || (format(c) === "flip" && typed.trim())) state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
-  if (round && !right && !round.retried.includes(c.id)) { round.retried.push(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
+  if (round && !round.exam && !right && !round.retried.includes(c.id)) { round.retried.push(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
   save(); clearDraft();
   lastScore = score;
+  if (round && round.exam) { current = null; return next(); }  // no answer shown until the paper is in
   if (format(c) === "flip") return advance(right);
   phase = "result"; render();
 }
@@ -704,6 +785,7 @@ $("scopes").addEventListener("click", e => {
 });
 $("chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;
+  if (b.dataset.ex) return changeSelection(u => { u.exam = b.dataset.ex; });
   const v = b.dataset.ch;
   changeSelection(u => {
     if (v === "all") u.chapters = [];
@@ -857,7 +939,7 @@ async function openDeck(id) {
   renderDecks(); load(); showUndoImport();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
-    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {};
+    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || [];
   } catch (e) { deck = []; scopes = []; }
   const u = ui();
   if (!scopes.some(s => s.id === u.scope)) u.scope = "all";
