@@ -184,13 +184,27 @@
   }
 
   // Exports carry schemaVersion. 1 (or none): [time, correct, sure] attempts only; 2 adds an essay score
-  // as a fourth attempt field, the ability model, settings and essay text. A file from a newer app is
-  // refused rather than half-read (finance-tools does the same for its workspace files).
-  const EXPORT_VERSION = 2;
+  // as a fourth attempt field, the ability model, settings and essay text; 3 adds a fifth field, the
+  // answer given (the letter picked, or the number typed), so a wrong answer can be traced to the
+  // misconception behind it instead of only counted. A file from a newer app is refused rather than
+  // half-read (finance-tools does the same for its workspace files).
+  const EXPORT_VERSION = 3;
+  const ANSWER_MAX = 40;
   const bit = x => x === 0 || x === 1;
   function validAttempt(e) {
     return Array.isArray(e) && e.length >= 3 && Number.isFinite(e[0]) && bit(e[1]) && bit(e[2]) &&
-      (e.length < 4 || (Number.isFinite(e[3]) && e[3] >= 0 && e[3] <= 1));
+      (e.length < 4 || (Number.isFinite(e[3]) && e[3] >= 0 && e[3] <= 1)) &&
+      (e.length < 5 || (typeof e[4] === "string" && e[4].length <= ANSWER_MAX));
+  }
+  // One attempt as saved: [time, correct, sure], then the score when it is partial or an answer
+  // follows, then the answer (mc letter or typed number, trimmed; essays and flips keep their text
+  // elsewhere, so they carry none).
+  function attempt(now, right, sure, score, answer) {
+    const e = [now, right ? 1 : 0, sure ? 1 : 0];
+    const given = typeof answer === "string" ? answer.trim().slice(0, ANSWER_MAX) : "";
+    if (given || (score !== 0 && score !== 1)) e.push(score);
+    if (given) e.push(given);
+    return e;
   }
   // Every problem found, in words for the learner; an empty list means the file can be merged.
   function validateExport(data) {
@@ -209,7 +223,7 @@
     return errs;
   }
 
-  const Engine = { EXPORT_VERSION, validateExport, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
+  const Engine = { EXPORT_VERSION, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, summarize, since, mastery, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
