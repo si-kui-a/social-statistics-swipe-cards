@@ -25,36 +25,43 @@
   --line: #2c3a45; --accent: #7fb0e6; --right: #6cc392; --wrong: #ec8a78; --tag: #22303c; color-scheme: dark } }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* .chips sets display, which would otherwise override hidden */
-html, body { margin: 0; min-height: 100%; }
+/* The page itself never scrolls (2026-10-13 request): every row has its height and only the card's
+   text scrolls, so reading a long explanation never moves the buttons or the card. */
+html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
   background-color: var(--paper);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 22px 22px;
   color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.7;
-  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.wrap { max-width: 480px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 32px; display: grid; gap: 14px; }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { font-family: var(--font-display); font-size: 1.45rem; margin: 0; letter-spacing: .02em; }
-.count { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 480px; height: 100vh; height: 100dvh; margin: 0 auto; display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+header { display: flex; gap: 8px; align-items: center; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.seg button { font: inherit; font-size: .85rem; padding: 4px 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; flex: 1; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--card); font-weight: 700; }
+header .seg { flex: 1; }
+header .seg button { font-size: .95rem; padding: 6px; }
+.menu-btn { font: inherit; font-size: 1.1rem; width: 40px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+.modes { display: flex; gap: 8px; }
 /* One swipeable row each: wrapped, the long chapter names filled a phone screen and pushed the card below it. */
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px;
+.chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 2px 12px;
   font: inherit; font-size: .85rem; cursor: pointer; flex: none; white-space: nowrap; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
-.decks { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.deck { font: inherit; font-weight: 700; padding: 8px; border: 0; background: var(--card); color: var(--muted); cursor: pointer; }
-.deck[aria-pressed="true"] { background: var(--accent); color: var(--card); }
-/* Taller than the old fixed 360px so a long question still leaves room; the input sits in .work,
-   pinned below the scrolling .body, so it never drops out of view. 390px is the header, deck and
-   filter rows plus the buttons below, so on a phone the whole card and its buttons fit one screen. */
-.stage { position: relative; height: clamp(360px, calc(100dvh - 390px), 620px); touch-action: pan-y; }
+.progress { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 30px; }
+.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; min-width: 40px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.undo { flex: none; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); font: inherit; font-size: .8rem; cursor: pointer; }
+.stage { position: relative; min-height: 0; touch-action: pan-y; }
 .card { position: absolute; inset: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 10px 28px rgb(0 0 0 / .08); display: flex; flex-direction: column;
   overflow: hidden; transition: transform .25s ease, opacity .25s ease; user-select: none; }
-.body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-.work { flex: none; display: grid; gap: 4px; padding: 10px 20px 14px; border-top: 1px solid var(--line); background: var(--card); }
+.body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.work { flex: none; display: grid; gap: 4px; padding: 10px 18px 12px; border-top: 1px solid var(--line); background: var(--card); }
 .work label { color: var(--muted); }
 .meta { display: flex; gap: 6px; font-size: .75rem; color: var(--muted); white-space: nowrap; }
 .meta span { background: var(--tag); border-radius: 6px; padding: 1px 8px; flex: none; }
@@ -70,15 +77,18 @@ pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono
   border: 2px solid; border-radius: 8px; opacity: 0; pointer-events: none; }
 .stamp.right { right: 18px; color: var(--right); transform: rotate(-8deg); }
 .stamp.wrong { left: 18px; color: var(--wrong); transform: rotate(8deg); }
-.undo { display: block; margin: 8px auto 0; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line, #ccc); background: transparent; color: inherit; font: inherit; }
-.undo[hidden] { display: none; }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-button.big { font: inherit; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+button.big { font: inherit; font-weight: 700; padding: 11px; border-radius: 12px; border: 1px solid var(--line);
   background: var(--card); color: var(--ink); cursor: pointer; }
 button.big.sure { border-color: var(--accent); color: var(--accent); }
 button.big.right { border-color: var(--right); color: var(--right); }
 button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
 button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+dialog { width: min(480px, 100vw); max-width: 100vw; max-height: 100dvh; margin: 0 auto; padding: 0; border: 0; border-radius: 0 0 14px 14px;
+  background: var(--paper); color: var(--ink); }
+dialog::backdrop { background: rgb(0 0 0 / .4); }
+.sheet { padding: 12px 16px 20px; display: grid; gap: 10px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
 details.box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; }
 details.box summary { cursor: pointer; font-weight: 700; }
 .stack { display: grid; gap: 10px; margin-top: 10px; }
@@ -87,6 +97,9 @@ textarea, select { font: inherit; color: var(--ink); background: var(--paper); b
 textarea { min-height: 70px; resize: vertical; }
 .status { font-size: .85rem; color: var(--muted); min-height: 1.2em; }
 .small { font-size: .85rem; color: var(--muted); margin: 0; }
+table.t { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
+table.t th, table.t td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+table.t td.n, table.t th.n { text-align: right; }
 .choices { display: grid; gap: 8px; }
 .choice { font: inherit; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--paper); color: var(--ink); cursor: pointer; }
@@ -103,58 +116,78 @@ textarea { min-height: 70px; resize: vertical; }
 .result { font-weight: 700; }
 .result.ok { color: var(--right); }
 .result.bad { color: var(--wrong); }
-.round { font-size: .8rem; color: var(--muted); margin: 0; }
+.score { font-family: var(--font-display); font-size: 2rem; line-height: 1.2; }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1 id="title">社會統計滑卡</h1>
-    <span class="count" id="count">載入中</span>
+    <h1 class="sr" id="title">社會統計滑卡</h1>
+    <div class="seg" id="decks" role="group" aria-label="選擇題庫"></div>
+    <button class="menu-btn" id="openMenu" type="button" aria-label="選單：成績、怎麼用、自製卡、備份">☰</button>
   </header>
-  <div class="decks" id="decks" role="group" aria-label="選擇題庫"></div>
-  <div class="chips" id="scopes" role="group" aria-label="選擇考試範圍" hidden></div>
-  <div class="chips" id="groups" role="group" aria-label="選擇大類" hidden></div>
+  <div class="modes">
+    <div class="seg" id="pace" role="group" aria-label="每輪份量">
+      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button>
+    </div>
+    <div class="seg" id="mix" role="group" aria-label="章節選法">
+      <button type="button" data-mix="0">單章</button><button type="button" data-mix="1">多章混合</button>
+    </div>
+  </div>
+  <div class="chips" id="scopes" role="group" aria-label="選擇考試範圍或大類"></div>
   <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
-  <p class="round" id="round"></p>
+  <div class="progress" aria-live="polite">
+    <span id="roundText"></span><span class="bar"><i id="barFill" style="width:0"></i></span><span id="today"></span>
+    <button class="undo" id="undo" type="button" hidden>↶ 反悔</button>
+  </div>
 
   <div class="stage" id="stage" aria-live="polite">
     <article class="card" id="card"><div class="q">正在載入題目……</div></article>
   </div>
   <div class="actions" id="actions"></div>
-  <button class="undo" id="undo" type="button" hidden>↶ 反悔上一張（重新作答）</button>
-
-  <details class="box">
-    <summary>怎麼用</summary>
-    <p class="small">選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點，有寫到關鍵字的要點會先幫你勾好。問答卡可先在作答框寫下答案（選填）再翻面對照，往右滑＝答對、往左滑＝答錯。<br>答錯的卡在這一輪最後再出現一次（選「有把握」卻答錯的，隔 3 張就再出現）；答對的卡依 1、3、7、14、30 天的間隔再出現，選「不確定」的答對不升級、隔天再複習。信心只影響複習時間，不影響得分。每張卡分基礎、標準、進階三級：App 依你各章的答題表現挑難度剛好的新卡，近期答對率高就多給新卡，答錯多或待複習的卡堆積時就少給。左右滑動卡片也可評分。</p>
-  </details>
-
-  <details class="box">
-    <summary>自己做一張卡</summary>
-    <form class="stack" id="addForm">
-      <label for="addChapter">章節<select id="addChapter"></select></label>
-      <label for="addQ">問題（用自己的話寫）<textarea id="addQ" required></textarea></label>
-      <label for="addA">答案（附一句「因為……」）<textarea id="addA" required></textarea></label>
-      <button class="big" type="submit">加入</button>
-      <div class="status" id="addStatus"></div>
-    </form>
-  </details>
-
-  <details class="box">
-    <summary>成績備份與搬移</summary>
-    <div class="stack">
-      <p class="small">成績只存在這支手機的這個 App 裡，不會上傳。每週按一次「匯出成績」，把檔案存到雲端硬碟或傳給自己，再放到電腦上分析；換手機時用「匯入成績」還原。</p>
-      <button class="big sure" id="export" type="button">匯出成績</button>
-      <button class="big" id="copy" type="button">複製成績文字</button>
-      <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
-      <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
-      <div class="status" id="backupStatus"></div>
-    </div>
-  </details>
-
-  <p class="small" id="offline"></p>
 </div>
+
+<dialog id="menu" aria-label="選單">
+  <div class="sheet">
+    <div class="sheet-head"><span id="menuTitle">選單</span><button class="menu-btn" id="closeMenu" type="button" aria-label="關閉">✕</button></div>
+    <details class="box" open>
+      <summary>成績</summary>
+      <div class="stack" id="scores"></div>
+    </details>
+    <details class="box">
+      <summary>怎麼用</summary>
+      <div class="stack">
+        <p class="small"><b>作答</b>：選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點。問答卡可先寫答案再翻面，往右滑＝答對、往左滑＝答錯。答錯或按錯時，8 秒內可按「↶ 反悔」重答。</p>
+        <p class="small"><b>排程複習</b>：每輪只出到期的複習卡加上適量新卡，答對的卡依 1、3、7、14、30 天再出現；適合每天練一點。<b>全部刷完</b>：所選範圍每張卡各出一次，可以一路滑到底，中途離開下次接著做。</p>
+        <p class="small"><b>單章</b>：點一個章節只練那一章。<b>多章混合</b>：可點選多個章節一起練，「全部」就是範圍內所有章節混在一起。每個選法各自記住進度，切換章節再回來會接著原本那一輪。</p>
+        <p class="small"><b>上方數字</b>：「本輪 7/20」是這一輪已作答／總張數（答錯重出的不另計），右邊是今天整個題庫的作答數與答對率，不受章節切換影響。答錯的卡在這一輪稍後再出現一次；選「有把握」卻答錯的，隔 3 張就再出現。</p>
+      </div>
+    </details>
+    <details class="box">
+      <summary>自己做一張卡</summary>
+      <form class="stack" id="addForm">
+        <label for="addChapter">章節<select id="addChapter"></select></label>
+        <label for="addQ">問題（用自己的話寫）<textarea id="addQ" required></textarea></label>
+        <label for="addA">答案（附一句「因為……」）<textarea id="addA" required></textarea></label>
+        <button class="big" type="submit">加入</button>
+        <div class="status" id="addStatus"></div>
+      </form>
+    </details>
+    <details class="box">
+      <summary>成績備份與搬移</summary>
+      <div class="stack">
+        <p class="small">成績只存在這支手機的這個 App 裡，不會上傳。每週按一次「匯出成績」，把檔案存到雲端硬碟或傳給自己；換手機時用「匯入成績」還原。</p>
+        <button class="big sure" id="export" type="button">匯出成績</button>
+        <button class="big" id="copy" type="button">複製成績文字</button>
+        <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
+        <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
+        <div class="status" id="backupStatus"></div>
+      </div>
+    </details>
+    <p class="small" id="offline"></p>
+  </div>
+</dialog>
 
 <script src="engine.js"></script>
 <script>
@@ -169,11 +202,15 @@ const DECKS = {
   research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newStart: 20 },
 };
 const DECK_KEY = "swipe-cards-deck";
+const KEEP_ROUNDS = 12, KEEP_HISTORY = 60;
 
 let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], current = null;
+// The round being played. Each selection (pace + scope + group + chapters) keeps its own round in
+// state.rounds, so switching chapters and back resumes it instead of drawing a new one: the counts on
+// screen no longer jump when the learner looks at another chapter (2026-10-13 request).
+let round = null, roundKey = "";
 // phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
-let scope = "all", chapter = "all", group = "all", retried = new Set();
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
 // Only right after answering: a time limit keeps it a mis-tap fix, not a way to retry until right.
 const UNDO_MS = 8000;
@@ -181,12 +218,12 @@ let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
-function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {} }; }
+function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [] }; }
 function load() {
   state = blank();
   try {
     const s = JSON.parse(localStorage.getItem(D().key) || "null");
-    if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [] };
+    if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [], rounds: s.rounds || {}, history: s.history || [] };
   } catch (e) { /* storage blocked: practise without saving */ }
 }
 // Say why a save failed: a full store needs an export, blocked storage cannot be fixed from here.
@@ -194,9 +231,10 @@ function saveError(e) {
   const msg = e && e.name === "QuotaExceededError"
     ? "手機上的 App 儲存空間已滿，這次作答沒有存到：請先「匯出成績」備份。"
     : `這次作答沒有存到（${(e && e.name) || "儲存失敗"}）：瀏覽器可能封鎖了網站資料，或正在使用私密瀏覽。`;
-  $("backupStatus").textContent = msg; $("round").textContent = msg;
+  $("backupStatus").textContent = msg; $("roundText").textContent = msg;
 }
 function save() {
+  if (round) { round.ids = queue.map(c => c.id); round.current = current ? current.id : null; }
   try { localStorage.setItem(D().key, JSON.stringify(state)); return true; }
   catch (e) { saveError(e); return false; }
 }
@@ -229,11 +267,22 @@ function md(text) {
 }
 
 function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
+function byId(id) { return allCards().find(c => c.id === id); }
 function format(c) { return ["mc", "num", "essay"].includes(c.format) ? c.format : "flip"; }
-// Filters, outermost first: exam scope (期中／期末, by course chapter), group (量化／質性／通論), chapter.
-function inScope(c) { const s = scopes.find(x => x.id === scope); return scope === "all" || (!!s && s.ch.includes(c.ch)); }
-function inGroup(c) { return inScope(c) && (group === "all" || c.group === group); }
-function inChapter(c) { return inGroup(c) && (chapter === "all" || c.chapter === chapter); }
+function ui() {
+  if (!state.ui || !state.ui.pace) state.ui = { scope: "all", group: "all", chapters: [], mix: false, pace: "sched", ...state.ui };
+  return state.ui;
+}
+// Filters, outermost first: exam scope (期中／期末, by course chapter), group (量化／質性／通論), chapters.
+function inScope(c) { const u = ui(), s = scopes.find(x => x.id === u.scope); return u.scope === "all" || (!!s && s.ch.includes(c.ch)); }
+function inGroup(c) { return inScope(c) && (ui().group === "all" || c.group === ui().group); }
+function inSelection(c) { const ch = ui().chapters; return inGroup(c) && (!ch.length || ch.includes(c.chapter)); }
+function selectionLabel() {
+  const u = ui(), labels = new Map(allCards().map(c => [c.chapter, c.label]));
+  const where = u.chapters.length ? u.chapters.map(k => (labels.get(k) || k).split("｜").pop()).join("＋")
+    : u.group !== "all" ? `全部${u.group}` : u.scope !== "all" ? (scopes.find(s => s.id === u.scope) || {}).title || "全部" : "全部章節";
+  return `${where}（${u.pace === "all" ? "全部刷完" : "排程複習"}）`;
+}
 
 function shuffle(list) {
   for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
@@ -244,53 +293,99 @@ function dueCount() {
   const now = Date.now();
   return allCards().filter(c => state.progress[c.id] && state.progress[c.id].due <= now).length;
 }
-function roundSize(cards) {
-  const r = Engine.buildRound(cards, state, { now: Date.now(), cap: newCap(), random: () => 0 });
-  return r.seen.length + r.fresh.length;
+function dayStart(t = Date.now()) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+// A new round for the current selection. ids: only these cards (retrying the missed ones);
+// ignoreDue: the scheduled pace with every seen card, for a second round on the same day.
+function newRound(opts = {}) {
+  const now = Date.now(), cards = allCards().filter(inSelection), pace = ui().pace;
+  let list, review = 0;
+  if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
+  else if (pace === "all") list = Engine.fullPass(cards, state, { now });
+  else {
+    state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
+    const r = Engine.buildRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue });
+    review = r.seen.length;
+    list = shuffle(r.seen.concat(r.fresh));
+  }
+  return { pace, label: selectionLabel(), started: now, total: list.length, review, ids: list.map(c => c.id),
+           current: null, results: [], retried: [], done: false, retry: !!opts.ids };
 }
 
-function buildQueue(ignoreDue) {
-  state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
-  save();
-  const r = Engine.buildRound(allCards().filter(inChapter), state, { now: Date.now(), cap: newCap(), ignoreDue });
-  queue = shuffle(r.seen.concat(r.fresh));
+function selectionKey() { const u = ui(); return [u.pace, u.scope, u.group, [...u.chapters].sort().join(",")].join("|"); }
+// Resume the selection's round when there is one: a scheduled round only on the day it was drawn (the
+// next day other cards are due), a full pass until it is finished, so a long chapter can take days.
+function openRound(fresh) {
+  roundKey = selectionKey();
+  let r = state.rounds[roundKey];
+  if (fresh || !r || (r.pace === "sched" && r.started < dayStart()) || (r.done && r.started < dayStart())) {
+    r = fresh && typeof fresh === "object" ? newRound(fresh) : newRound();
+  }
+  r.used = Date.now();
+  state.rounds[roundKey] = round = r;
+  const keys = Object.keys(state.rounds).sort((a, b) => state.rounds[b].used - state.rounds[a].used);
+  for (const k of keys.slice(KEEP_ROUNDS)) delete state.rounds[k];
+  queue = r.ids.map(byId).filter(Boolean);
+  current = r.current ? byId(r.current) || null : null;
   // An unfinished answer comes back first, even when this round would not have drawn its card.
-  const d = loadDraft(), held = d && allCards().filter(inChapter).find(c => c.id === d.id);
-  if (held) queue = [held, ...queue.filter(c => c.id !== held.id)];
-  retried = new Set(); undo = null;
-  const scores = Engine.recentScores(state.progress, 30);
-  const acc = scores.length ? `・近期得分 ${Math.round(100 * scores.reduce((a, b) => a + b, 0) / scores.length)}%` : "";
-  $("round").textContent = `複習 ${r.seen.length}・新卡 ${r.fresh.length}${acc}`;
+  const d = loadDraft(), held = d && allCards().filter(inSelection).find(c => c.id === d.id);
+  if (held && (!current || current.id !== held.id)) {
+    if (current) queue.unshift(current);
+    queue = queue.filter(c => c.id !== held.id); current = held;
+  }
+  undo = null; showUndoButton();
+  phase = "front"; picked = null; typed = ""; ticks = [];
+  if (current && d && d.id === current.id) { typed = d.typed || ""; picked = d.picked || null; }
+  if (!current) return next();
+  save(); render();
 }
 
-function chipRow(el, items, active, attr) {
+function chipRow(el, items, isActive, attr) {
   el.innerHTML = items.map(([key, text, n]) =>
-    `<button class="chip" data-${attr}="${esc(key)}" aria-pressed="${active === key}">${esc(text)} · ${n}</button>`).join("");
+    `<button class="chip" data-${attr}="${esc(key)}" aria-pressed="${isActive(key)}">${esc(text)} · ${n}</button>`).join("");
 }
+// Chip numbers are how many cards each choice holds, so 全部 is the sum of its chapters.
 function renderChips() {
-  const cards = allCards();
-  $("scopes").hidden = !scopes.length;
-  chipRow($("scopes"), [["all", "全部範圍", roundSize(cards)],
-    ...scopes.map(s => [s.id, s.title, roundSize(cards.filter(c => s.ch.includes(c.ch)))])], scope, "s");
+  const cards = allCards(), u = ui();
+  document.querySelectorAll("#pace button").forEach(b => b.setAttribute("aria-pressed", b.dataset.pace === u.pace));
+  document.querySelectorAll("#mix button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mix === (u.mix ? "1" : "0")));
+  const outer = scopes.length
+    ? [["s:all", "全部範圍", cards.length], ...scopes.map(s => [`s:${s.id}`, s.title, cards.filter(c => s.ch.includes(c.ch)).length])]
+    : [];
   const inS = cards.filter(inScope);
   const groups = [...new Set([...inS].sort((a, b) => a.chapter < b.chapter ? -1 : 1).filter(c => c.group).map(c => c.group))];
-  $("groups").hidden = !groups.length;
-  chipRow($("groups"), [["all", "全部大類", roundSize(inS)],
-    ...groups.map(g => [g, g, roundSize(inS.filter(c => c.group === g))])], group, "g");
+  if (groups.length) outer.push(...(scopes.length ? [] : [["g:all", "全部大類", inS.length]]),
+    ...groups.map(g => [`g:${g}`, g, inS.filter(c => c.group === g).length]));
+  $("scopes").hidden = !outer.length;
+  chipRow($("scopes"), outer, k => k === `s:${u.scope}` || k === `g:${u.group}`, "f");
   const inG = cards.filter(inGroup);
   const chapters = [...new Map(inG.map(c => [c.chapter, c.label])).entries()].sort();
-  const short = l => group === "all" ? l : l.split("｜").pop();
-  chipRow($("chips"), [["all", group === "all" ? "全部" : `全部${group}`, roundSize(inG)],
-    ...chapters.map(([k, l]) => [k, short(l), roundSize(inG.filter(c => c.chapter === k))])], chapter, "ch");
+  const short = l => u.group === "all" ? l : l.split("｜").pop();
+  chipRow($("chips"), [["all", u.group === "all" ? "全部" : `全部${u.group}`, inG.length],
+    ...chapters.map(([k, l]) => [k, short(l), inG.filter(c => c.chapter === k).length])],
+    k => k === "all" ? !u.chapters.length : u.chapters.includes(k), "ch");
   const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
   $("addChapter").innerHTML = all.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
 }
 
+// Round progress counts first attempts only; today's numbers cover the whole deck, so neither moves
+// when another chapter is picked.
+function renderProgress() {
+  const done = round ? round.results.length : 0, total = round ? Math.max(round.total, done) : 0;
+  const right = round ? round.results.filter(r => r.right).length : 0;
+  $("roundText").textContent = total ? `本輪 ${done}/${total}・✓${right} ✗${done - right}` : "本輪沒有卡";
+  $("barFill").style.width = `${total ? Math.round(100 * done / total) : 0}%`;
+  const t = Engine.since(state.progress, dayStart());
+  $("today").textContent = t.n ? `今天 ${t.n} 題 ${t.pct}%` : "今天 0 題";
+}
+
 function setActions() {
   const f = current ? format(current) : "";
-  $("undo").hidden = !undo || Date.now() - undo.at > UNDO_MS;
+  const missed = round ? Engine.summarize(round.results).missed.length : 0;
   $("actions").innerHTML =
-    !current ? (deck.length ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "") :
+    !current ? (!deck.length ? "" :
+      `<button class="big" id="retryMissed" type="button" ${missed ? "" : "disabled"}>重練答錯的（${missed}）</button>` +
+      `<button class="big sure" id="again" type="button">${ui().pace === "all" ? "從頭再刷一次" : "再練一輪（含未到期）"}</button>`) :
     phase === "front" ? `<button class="big" id="unsure" type="button">${f === "flip" ? "翻面" : "送出"}：不確定</button><button class="big sure" id="sure" type="button">${f === "flip" ? "翻面" : "送出"}：有把握</button>` :
     phase === "back" ? `<button class="big wrong" id="bad" type="button">← 答錯</button><button class="big right" id="good" type="button">答對 →</button>` :
     phase === "rubric" ? `<span></span><button class="big sure" id="score" type="button">完成評分</button>` :
@@ -323,14 +418,26 @@ function workArea(c) {
   return `<div class="work"><label for="essayIn">${label}</label><textarea id="essayIn"${f === "flip" ? ' class="optional"' : ""}>${esc(typed)}</textarea></div>`;
 }
 
+function summaryHtml(r) {
+  const s = Engine.summarize(r.results);
+  const rows = s.byLabel.map(b => `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${Math.round(100 * b.right / b.n)}%</td></tr>`).join("");
+  const left = r.pace === "all" ? "" : `<p class="small">明天再回來：分開幾天複習，比一次做很多張記得久。</p>`;
+  return `<div class="meta"><span>本輪完成</span><span>${esc(r.label)}</span></div>
+    <div class="score">${s.right} / ${s.n}　<span class="result ${s.pct >= 75 ? "ok" : "bad"}">${s.pct}%</span></div>
+    <p class="small">有把握卻答錯 <b>${s.sureWrong.length}</b> 張（最該弄懂的觀念）・不確定但答對 ${s.unsureRight} 張（明天再複習）</p>
+    ${rows ? `<table class="t"><tr><th>章節</th><th class="n">答對</th><th class="n">得分</th></tr>${rows}</table>` : ""}
+    ${left}<p class="hint">每一輪的成績都記在「☰ → 成績」，也會跟著「匯出成績」存下來。</p>`;
+}
+
 function render() {
   const card = $("card");
-  $("count").textContent = `剩 ${queue.length + (current ? 1 : 0)} 張`;
-  card.style.transform = ""; card.style.opacity = "";
+  card.style.transform = ""; card.style.opacity = ""; card.style.transition = "";
+  renderProgress();
   if (!current) {
-    card.innerHTML = deck.length
-      ? `<div class="meta"><span>今天完成</span></div><div class="q">這一輪的卡片都做完了。</div><p class="hint">明天再回來。分開幾天複習，比一次做很多張記得久。</p>`
-      : `<div class="meta"><span>沒有題目</span></div><div class="q">題目還沒下載。請連上網路後重新開啟。</div>`;
+    card.innerHTML = `<div class="body">${!deck.length
+      ? `<div class="meta"><span>沒有題目</span></div><div class="q">題目還沒下載。請連上網路後重新開啟。</div>`
+      : round && round.results.length ? summaryHtml(round)
+      : `<div class="meta"><span>沒有待做的卡</span></div><div class="q">這個範圍今天沒有到期的卡。</div><p class="hint">想多練可以按「再練一輪」，或改選「全部刷完」。</p>`}</div>`;
     setActions();
     return;
   }
@@ -355,11 +462,21 @@ function render() {
   setActions();
 }
 
+// The end of a round is written to the history once, with what the summary screen shows.
+function finishRound() {
+  if (!round || round.done || !round.results.length) return;
+  round.done = true;
+  const s = Engine.summarize(round.results);
+  state.history = [...state.history, { t: Date.now(), label: round.label, pace: round.pace, retry: round.retry, n: s.n, right: s.right,
+                                        sureWrong: s.sureWrong.length }].slice(-KEEP_HISTORY);
+}
+
 function next() {
   current = queue.shift() || null; phase = "front"; picked = null; typed = ""; ticks = [];
   const d = loadDraft();
   if (current && d && d.id === current.id) { typed = d.typed || ""; picked = d.picked || null; }
-  render();
+  if (!current) finishRound();
+  save(); render();
 }
 
 function submit(isSure) {
@@ -372,86 +489,101 @@ function submit(isSure) {
   record(Engine.grade(c, f === "mc" ? picked : typed));
 }
 
-// Saves one attempt: Leitner box, ability, and for essays the text written, then shows the result
-// (auto-graded formats) or moves on (flip cards, graded by the swipe itself).
+// Saves one attempt: Leitner box, ability, round result and for essays the text written, then shows
+// the result (auto-graded formats) or moves on (flip cards, graded by the swipe itself).
 function record(score) {
   const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
-  undo = { state: JSON.stringify(state), queue: queue.slice(), retried: [...retried], card: c, typed, picked,
-           ticks: ticks.slice(), phase: format(c) === "flip" ? "back" : "front", at: now };
+  save();  // round.ids/current as they are now, so undo can put them back
+  undo = { state: JSON.stringify(state), card: c, typed, picked, ticks: ticks.slice(),
+           phase: format(c) === "flip" ? "back" : "front", at: now };
   startUndoClock();
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
   const entry = [now, right ? 1 : 0, sure];
   if (score !== 0 && score !== 1) entry.push(score);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   Engine.updateAbility(state.model, c, score);
+  if (round && !round.results.some(r => r.id === c.id)) round.results.push({ id: c.id, label: c.label || c.chapter, right, sure });
   // Flip cards keep what was written too, when anything was (no rubric, so ticks stays empty).
   if (format(c) === "essay" || (format(c) === "flip" && typed.trim())) state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
+  if (round && !right && !round.retried.includes(c.id)) { round.retried.push(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
   save(); clearDraft();
-  if (!right && !retried.has(c.id)) { retried.add(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
   lastScore = score;
   if (format(c) === "flip") return advance(right);
   phase = "result"; render();
 }
 
-// Puts box, ability, log and retry queue back as they were before the last answer was saved,
-// and shows that card again to answer anew.
-function startUndoClock() {
-  clearInterval(undoTicker);
-  const tick = () => {
-    const left = undo ? UNDO_MS - (Date.now() - undo.at) : 0;
-    if (left <= 0) { undo = null; clearInterval(undoTicker); $("undo").hidden = true; return; }
-    $("undo").hidden = false;
-    $("undo").textContent = `↶ 反悔上一張（${Math.ceil(left / 1000)} 秒內）`;
-  };
-  tick(); undoTicker = setInterval(tick, 250);
+function showUndoButton() {
+  const left = undo ? UNDO_MS - (Date.now() - undo.at) : 0;
+  if (left <= 0) { undo = null; clearInterval(undoTicker); $("undo").hidden = true; return; }
+  $("undo").hidden = false;
+  $("undo").textContent = `↶ 反悔 ${Math.ceil(left / 1000)}`;
 }
+function startUndoClock() { clearInterval(undoTicker); showUndoButton(); undoTicker = setInterval(showUndoButton, 250); }
 
+// Puts box, ability, log, round results and queue back as they were before the last answer was
+// saved, and shows that card again to answer anew.
 function undoLast() {
   if (!undo || Date.now() - undo.at > UNDO_MS) { undo = null; $("undo").hidden = true; return; }
   clearInterval(undoTicker);
   if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
-  const u = undo; undo = null;
+  const u = undo; undo = null; $("undo").hidden = true;
   const old = JSON.parse(u.state);
   Object.keys(state).forEach(k => delete state[k]); Object.assign(state, old);
-  queue = u.queue; retried = new Set(u.retried);
+  round = state.rounds[roundKey] || null;
+  queue = round ? round.ids.map(byId).filter(Boolean) : [];
   current = u.card; phase = u.phase; typed = u.typed; picked = u.picked; ticks = u.ticks;
   save(); saveDraft();
-  const card = $("card"); card.style.transform = ""; card.style.opacity = "";
-  renderChips(); render();
+  render();
 }
 
 function advance(right) {
   const card = $("card");
+  card.style.transition = "";
   card.style.transform = `translateX(${right ? 420 : -420}px) rotate(${right ? 14 : -14}deg)`;
   card.style.opacity = "0";
   current = null;
-  advanceTimer = setTimeout(() => { advanceTimer = null; next(); renderChips(); }, 220);
+  advanceTimer = setTimeout(() => { advanceTimer = null; next(); }, 220);
 }
 
-let startX = null;
+// Swiping. A drag counts only once it is clearly sideways (axis lock, as in common swipe libraries);
+// a vertical start belongs to the card's scrolling. pointercancel never grades: phones send it when the
+// browser takes over a scroll, often with clientX 0, which read as a long left swipe and skipped the
+// explanation being scrolled (2026-10-13). Releasing a short drag only resets the transform; a full
+// render would rebuild the card and throw away the reading position.
+const AXIS_PX = 12, SWIPE_PX = 90;
+let drag = null;
+function resetDrag() {
+  const card = $("card");
+  card.style.transition = ""; card.style.transform = "";
+  card.querySelectorAll(".stamp").forEach(s => { s.style.opacity = ""; });
+}
 $("stage").addEventListener("pointerdown", e => {
   if (current && (phase === "back" || phase === "result") && !e.target.closest("button, input, textarea")) {
-    startX = e.clientX; $("card").style.transition = "none";
+    drag = { x: e.clientX, y: e.clientY, axis: null, id: e.pointerId };
   }
 });
 window.addEventListener("pointermove", e => {
-  if (startX === null) return;
-  const dx = e.clientX - startX, card = $("card");
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.axis) {
+    if (Math.abs(dy) >= AXIS_PX && Math.abs(dy) >= Math.abs(dx)) { drag = null; return; }  // a scroll
+    if (Math.abs(dx) < AXIS_PX || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+    drag.axis = "x"; $("card").style.transition = "none";
+  }
+  const card = $("card");
   card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
   if (phase === "back") {
-    card.querySelector(".stamp.right").style.opacity = Math.max(0, Math.min(1, dx / 90));
-    card.querySelector(".stamp.wrong").style.opacity = Math.max(0, Math.min(1, -dx / 90));
+    card.querySelector(".stamp.right").style.opacity = Math.max(0, Math.min(1, dx / SWIPE_PX));
+    card.querySelector(".stamp.wrong").style.opacity = Math.max(0, Math.min(1, -dx / SWIPE_PX));
   }
 });
-function endDrag(e) {
-  if (startX === null) return;
-  const dx = e.clientX - startX; startX = null;
-  $("card").style.transition = "";
-  if (Math.abs(dx) <= 90 || !current) return render();
+window.addEventListener("pointerup", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag, dx = e.clientX - d.x; drag = null;
+  if (d.axis !== "x" || Math.abs(dx) <= SWIPE_PX || !current) return resetDrag();
   if (phase === "back") record(dx > 0 ? 1 : 0); else advance(Engine.passed(current, lastScore));
-}
-window.addEventListener("pointerup", endDrag);
-window.addEventListener("pointercancel", endDrag);
+});
+window.addEventListener("pointercancel", () => { if (drag) { drag = null; resetDrag(); } });
 
 $("card").addEventListener("click", e => {
   const b = e.target.closest(".choice");
@@ -468,11 +600,12 @@ $("actions").addEventListener("click", e => {
   if (id === "bad" && current) record(0);
   if (id === "score" && current) { const n = (current.points || []).length; record(Engine.grade(current, Array.from({ length: n }, (_, i) => !!ticks[i]))); }
   if (id === "next" && current) advance(Engine.passed(current, lastScore));
-  if (id === "again") { buildQueue(true); next(); }
+  if (id === "again") openRound({ ignoreDue: true });
+  if (id === "retryMissed" && round) openRound({ ids: Engine.summarize(round.results).missed });
 });
 $("undo").addEventListener("click", undoLast);
 window.addEventListener("keydown", e => {
-  if (e.target.closest("form, details, textarea, input")) return;
+  if (e.target.closest("form, dialog, textarea, input")) return;
   if (e.key === "z" || e.key === "Z") return undoLast();
   if (!current) return;
   const f = format(current);
@@ -483,12 +616,50 @@ window.addEventListener("keydown", e => {
   else if (phase === "back" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) record(e.key === "ArrowRight" ? 1 : 0);
   else if (phase === "result" && (e.key === "ArrowRight" || e.key === "Enter")) advance(Engine.passed(current, lastScore));
 });
-function pickFilter(attr, apply) {
-  return e => { const b = e.target.closest(".chip"); if (!b) return; apply(b.dataset[attr]); state.ui = { scope }; save(); renderChips(); buildQueue(); next(); };
+
+// Selection changes keep the round being left in state.rounds and open (or resume) the new one.
+function changeSelection(apply) { save(); apply(ui()); renderChips(); openRound(); }
+$("pace").addEventListener("click", e => { const b = e.target.closest("button"); if (b) changeSelection(u => { u.pace = b.dataset.pace; }); });
+$("mix").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) changeSelection(u => { u.mix = b.dataset.mix === "1"; if (!u.mix) u.chapters = u.chapters.slice(0, 1); });
+});
+$("scopes").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  const [kind, v] = [b.dataset.f.slice(0, 1), b.dataset.f.slice(2)];
+  changeSelection(u => { if (kind === "s") { u.scope = v; u.group = "all"; } else u.group = v; u.chapters = []; });
+});
+$("chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  const v = b.dataset.ch;
+  changeSelection(u => {
+    if (v === "all") u.chapters = [];
+    else if (!u.mix) u.chapters = [v];
+    else u.chapters = u.chapters.includes(v) ? u.chapters.filter(x => x !== v) : [...u.chapters, v];
+  });
+});
+
+// Menu: scores, help, own cards and backup, kept off the main screen so the card has the room.
+function renderScores() {
+  const s = round ? Engine.summarize(round.results) : null;
+  const now = round && s.n ? `<p class="small">這一輪（${esc(round.label)}）：已作答 ${s.n}/${Math.max(round.total, s.n)}，答對 ${s.right}（${s.pct}%），有把握卻答錯 ${s.sureWrong.length}。</p>` : "";
+  const hist = state.history.slice(-10).reverse().map(h => {
+    const d = new Date(h.t), when = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `<tr><td>${when}</td><td>${esc(h.label)}${h.retry ? "・重練" : ""}</td><td class="n">${h.right}/${h.n}</td><td class="n">${Math.round(100 * h.right / h.n)}%</td></tr>`;
+  }).join("");
+  const labels = [...new Map(allCards().map(c => [c.chapter, c.label])).entries()].sort();
+  const mast = labels.map(([k, l]) => {
+    const m = Engine.mastery(allCards().filter(c => c.chapter === k), state.progress);
+    return `<tr><td>${esc(l.split("｜").pop())}</td><td class="n">${m.mastered}</td><td class="n">${m.learning}</td><td class="n">${m.unseen}</td></tr>`;
+  }).join("");
+  $("scores").innerHTML = `${now}
+    <table class="t"><tr><th>完成時間</th><th>範圍</th><th class="n">答對</th><th class="n">得分</th></tr>${hist || `<tr><td colspan="4">還沒有完成的一輪</td></tr>`}</table>
+    <p class="small">各章熟練度（熟練＝連續答對、間隔已到 7 天以上）</p>
+    <table class="t"><tr><th>章節</th><th class="n">熟練</th><th class="n">學習中</th><th class="n">未做</th></tr>${mast}</table>`;
 }
-$("scopes").addEventListener("click", pickFilter("s", v => { scope = v; group = "all"; chapter = "all"; }));
-$("groups").addEventListener("click", pickFilter("g", v => { group = v; chapter = "all"; }));
-$("chips").addEventListener("click", pickFilter("ch", v => { chapter = v; }));
+$("openMenu").addEventListener("click", () => { renderScores(); $("menuTitle").textContent = `${D().title}・選單`; $("menu").showModal(); });
+$("closeMenu").addEventListener("click", () => $("menu").close());
+$("menu").addEventListener("click", e => { if (e.target === $("menu")) $("menu").close(); });
 
 $("addForm").addEventListener("submit", e => {
   e.preventDefault();
@@ -499,14 +670,16 @@ $("addForm").addEventListener("submit", e => {
   if (from.group) card.group = from.group;
   if (from.ch !== undefined) card.ch = from.ch;
   state.mine.push(card);
-  if (save()) { $("addQ").value = ""; $("addA").value = ""; $("addStatus").textContent = "已加入，這一輪最後會出現。"; }
-  queue.push({ ...card, kind: "mine" }); renderChips();
+  const mine = { ...card, kind: "mine" };
+  if (inSelection(mine) && round) { queue.push(mine); round.total++; }
+  if (save()) { $("addQ").value = ""; $("addA").value = ""; $("addStatus").textContent = inSelection(mine) ? "已加入，這一輪最後會出現。" : "已加入，選到它的章節時會出現。"; }
+  renderChips(); if (!current) next(); else renderProgress();
 });
 
 function exportText() {
   return JSON.stringify({ schemaVersion: Engine.EXPORT_VERSION, exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
                           progress: state.progress, mine: state.mine, model: state.model, settings: state.settings,
-                          essays: state.essays }, null, 1);
+                          essays: state.essays, history: state.history }, null, 1);
 }
 $("export").addEventListener("click", () => {
   const blob = new Blob([exportText()], { type: "application/json" });
@@ -526,7 +699,7 @@ function attempts(model) { return Object.values((model || {}).n || {}).reduce((a
 // replaces so 復原到匯入前 can undo it, and reports a failure during the merge itself instead of
 // calling the file invalid (finance-tools: an untested catch once hid the real error).
 const snapshotKey = () => `${D().key}.before-import`;
-function showUndo() { let has = false; try { has = !!localStorage.getItem(snapshotKey()); } catch (e) { /* none */ } $("undoImport").hidden = !has; }
+function showUndoImport() { let has = false; try { has = !!localStorage.getItem(snapshotKey()); } catch (e) { /* none */ } $("undoImport").hidden = !has; }
 $("importFile").addEventListener("change", async e => {
   const file = e.target.files[0]; if (!file) return;
   e.target.value = "";
@@ -540,6 +713,7 @@ $("importFile").addEventListener("change", async e => {
     $("backupStatus").textContent = `這是「${(DECKS[from] || { title: from }).title}」的成績，請先切換到那個題庫再匯入。`;
     return;
   }
+  save();
   try { localStorage.setItem(snapshotKey(), JSON.stringify(state)); }
   catch (err) { saveError(err); return; }
   try {
@@ -555,13 +729,20 @@ $("importFile").addEventListener("change", async e => {
     }
     const have = new Set(state.mine.map(m => m.id));
     for (const m of data.mine || []) if (!have.has(m.id)) state.mine.push(m);
+    if (Array.isArray(data.history)) {
+      const ts = new Set(state.history.map(h => h.t));
+      state.history = [...state.history, ...data.history.filter(h => h && Number.isFinite(h.t) && !ts.has(h.t))]
+        .sort((a, b) => a.t - b.t).slice(-KEEP_HISTORY);
+    }
   } catch (err) {
     load();  // drop the half-merged state; the saved copy was never touched
     $("backupStatus").textContent = `匯入途中出錯，已放棄這次匯入（${err.message}）。`;
     return;
   }
+  state.rounds = {};  // rounds were drawn from the old progress
+  round = null;
   if (!save()) return;
-  renderChips(); buildQueue(); next(); showUndo();
+  renderChips(); openRound(); showUndoImport(); renderScores();
   $("backupStatus").textContent = `已匯入 ${Object.keys(data.progress).length} 張卡的成績。如有問題可按「復原到匯入前」。`;
 });
 $("undoImport").addEventListener("click", () => {
@@ -570,7 +751,7 @@ $("undoImport").addEventListener("click", () => {
     if (!snap) return;
     localStorage.setItem(D().key, snap); localStorage.removeItem(snapshotKey());
   } catch (err) { saveError(err); return; }
-  load(); renderChips(); buildQueue(); next(); showUndo();
+  round = null; load(); renderChips(); openRound(); showUndoImport(); renderScores();
   $("backupStatus").textContent = "已復原到上次匯入前的成績。";
 });
 
@@ -580,25 +761,29 @@ window.addEventListener("offline", showOnline);
 
 function renderDecks() {
   $("decks").innerHTML = Object.entries(DECKS).map(([id, d]) =>
-    `<button class="deck" type="button" data-deck="${id}" aria-pressed="${id === deckId}">${esc(d.title)}</button>`).join("");
+    `<button type="button" data-deck="${id}" aria-pressed="${id === deckId}">${esc(d.title)}</button>`).join("");
   $("title").textContent = `${D().title}滑卡`;
   document.title = `${D().title}滑卡`;
 }
 
 async function openDeck(id) {
+  if (round) save();
   deckId = DECKS[id] ? id : "stats";
   try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
-  group = "all"; chapter = "all"; current = null; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
-  renderDecks(); load(); showUndo();
+  round = null; current = null; queue = []; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
+  renderDecks(); load(); showUndoImport();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
     deck = doc.cards || []; scopes = doc.scopes || [];
   } catch (e) { deck = []; scopes = []; }
-  scope = scopes.some(s => s.id === (state.ui || {}).scope) ? state.ui.scope : "all";
-  renderChips(); buildQueue(); next();
+  const u = ui();
+  if (!scopes.some(s => s.id === u.scope)) u.scope = "all";
+  const known = new Set(allCards().map(c => c.chapter));
+  u.chapters = u.chapters.filter(k => known.has(k));
+  renderChips(); openRound();
 }
 $("decks").addEventListener("click", e => {
-  const b = e.target.closest(".deck");
+  const b = e.target.closest("button");
   if (b && b.dataset.deck !== deckId) openDeck(b.dataset.deck);
 });
 
