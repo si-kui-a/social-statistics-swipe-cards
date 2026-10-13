@@ -79,7 +79,7 @@ ok("rounded small values still pass", E.grade({ format: "num", num: { value: 0.0
 const good = { schemaVersion: 2, progress: { a: { box: 1, due: 5, log: [[1, 1, 0], [2, 0, 1, 0.5]] } }, mine: [], essays: { a: [] }, model: { theta: { 3: 0.2 } } };
 ok("valid export passes", E.validateExport(good).length === 0);
 ok("old export without version passes", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 1, 0]] } } }).length === 0);
-ok("newer version refused", E.validateExport({ ...good, schemaVersion: 3 }).some(m => m.includes("v3")));
+ok("newer version refused", E.validateExport({ ...good, schemaVersion: E.EXPORT_VERSION + 1 }).some(m => m.includes(`v${E.EXPORT_VERSION + 1}`)));
 ok("broken attempt refused", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 2, 0]] } } }).length === 1);
 ok("missing log refused", E.validateExport({ progress: { a: { box: 0, due: 0 } } }).length === 1);
 ok("score above 1 refused", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 1, 0, 1.5]] } } }).length === 1);
@@ -102,6 +102,15 @@ ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 
   const m = E.mastery(cs, st.progress);
   ok("mastery groups", m.unseen === 1 && m.learning === 2 && m.mastered === 1);
 }
+
+/// v3 attempts keep the answer given, so a wrong pick can be traced to its misconception
+ok("attempt: mc keeps the letter", JSON.stringify(E.attempt(5, false, 1, 0, "B")) === "[5,0,1,0,\"B\"]");
+ok("attempt: flip has no answer field", JSON.stringify(E.attempt(5, true, 0, 1, "")) === "[5,1,0]");
+ok("attempt: essay keeps a partial score only", JSON.stringify(E.attempt(5, true, 1, 0.75)) === "[5,1,1,0.75]");
+ok("attempt: typed number trimmed and capped", E.attempt(5, false, 1, 0, "  " + "9".repeat(60)).at(-1).length === 40);
+ok("export v3: answer field accepted", E.validateExport({ schemaVersion: 3, progress: { a: { box: 0, due: 0, log: [[1, 0, 1, 0, "C"]] } } }).length === 0);
+ok("export: an answer that is not text is refused", E.validateExport({ schemaVersion: 3, progress: { a: { box: 0, due: 0, log: [[1, 0, 1, 0, 3]] } } }).length === 1);
+ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progress: { a: { box: 0, due: 0, log: [[1, 1, 1]] } } }).length === 0);
 
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)

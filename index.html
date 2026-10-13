@@ -498,8 +498,7 @@ function record(score) {
            phase: format(c) === "flip" ? "back" : "front", at: now };
   startUndoClock();
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
-  const entry = [now, right ? 1 : 0, sure];
-  if (score !== 0 && score !== 1) entry.push(score);
+  const f = format(c), entry = Engine.attempt(now, right, sure, score, f === "mc" ? picked : f === "num" ? typed : "");
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   Engine.updateAbility(state.model, c, score);
   if (round && !round.results.some(r => r.id === c.id)) round.results.push({ id: c.id, label: c.label || c.chapter, right, sure });
