@@ -175,7 +175,9 @@ let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], curre
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
 let scope = "all", chapter = "all", group = "all", retried = new Set();
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
-let undo = null, advanceTimer = null;
+// Only right after answering: a time limit keeps it a mis-tap fix, not a way to retry until right.
+const UNDO_MS = 8000;
+let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
@@ -286,7 +288,7 @@ function renderChips() {
 
 function setActions() {
   const f = current ? format(current) : "";
-  $("undo").hidden = !undo;
+  $("undo").hidden = !undo || Date.now() - undo.at > UNDO_MS;
   $("actions").innerHTML =
     !current ? (deck.length ? `<button class="big sure" id="again" type="button">再練一輪（含未到期）</button><span></span>` : "") :
     phase === "front" ? `<button class="big" id="unsure" type="button">${f === "flip" ? "翻面" : "送出"}：不確定</button><button class="big sure" id="sure" type="button">${f === "flip" ? "翻面" : "送出"}：有把握</button>` :
@@ -375,7 +377,8 @@ function submit(isSure) {
 function record(score) {
   const c = current, now = Date.now(), p = state.progress[c.id] || { box: 0, log: [] };
   undo = { state: JSON.stringify(state), queue: queue.slice(), retried: [...retried], card: c, typed, picked,
-           ticks: ticks.slice(), phase: format(c) === "flip" ? "back" : "front" };
+           ticks: ticks.slice(), phase: format(c) === "flip" ? "back" : "front", at: now };
+  startUndoClock();
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
   const entry = [now, right ? 1 : 0, sure];
   if (score !== 0 && score !== 1) entry.push(score);
@@ -392,8 +395,20 @@ function record(score) {
 
 // Puts box, ability, log and retry queue back as they were before the last answer was saved,
 // and shows that card again to answer anew.
+function startUndoClock() {
+  clearInterval(undoTicker);
+  const tick = () => {
+    const left = undo ? UNDO_MS - (Date.now() - undo.at) : 0;
+    if (left <= 0) { undo = null; clearInterval(undoTicker); $("undo").hidden = true; return; }
+    $("undo").hidden = false;
+    $("undo").textContent = `↶ 反悔上一張（${Math.ceil(left / 1000)} 秒內）`;
+  };
+  tick(); undoTicker = setInterval(tick, 250);
+}
+
 function undoLast() {
-  if (!undo) return;
+  if (!undo || Date.now() - undo.at > UNDO_MS) { undo = null; $("undo").hidden = true; return; }
+  clearInterval(undoTicker);
   if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
   const u = undo; undo = null;
   const old = JSON.parse(u.state);
