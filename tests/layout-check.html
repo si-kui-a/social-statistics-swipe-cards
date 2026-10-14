@@ -195,6 +195,9 @@
     if (W.eval("ui().scope") !== "all" || !W.eval("allCards().filter(inSelection).length")) failures.push("picking 質性 under 本學期 left no cards");
     for (const deckName of Object.keys(W.eval("DECKS"))) {
       await W.eval(`openDeck(${JSON.stringify(deckName)})`);
+      // every deck names its sources in the menu (出處與著作權, 2026-10-14)
+      seen.push(`sources/${deckName} listed`);
+      if (!D.querySelectorAll("#deckSources li b").length) failures.push(`${deckName}: no sources listed under 出處與著作權`);
       for (const ex of W.eval("exams")) {
         seen.push(`exam/${deckName} ${ex.id} fills`);
         const b = W.Engine.buildExam(W.eval("allCards()"), ex);

@@ -5125,5 +5125,28 @@
     }
    ]
   }
+ ],
+ "sources": [
+  {
+   "name": "國家考試社會學試題（考選部，民國 101 年起：社會學、社會學概要、社會學大意、社會學與社會工作）",
+   "basis": "依著作權法第 9 條第 1 項第 5 款；選擇題答案為考選部標準答案",
+   "license": "不受著作權保護"
+  },
+  {
+   "basis": "改寫（選段、中譯、出題）並標明出處；英文引文照錄原書，其中《共產黨宣言》為 1888 年 Moore 公有領域譯本",
+   "license": "CC BY-SA 4.0",
+   "name": "Allison Hurst, Classical Sociological Theory and Foundations of American Sociology (Oregon State University Ecampus)",
+   "url": "https://open.oregonstate.education/sociologicaltheory"
+  },
+  {
+   "name": "依課程讀本章節自編的問答題（Giddens《資本主義與現代社會理論》等）",
+   "basis": "作者自行撰寫，只依讀本的章節主題出題，不收讀本原文",
+   "license": "CC BY-SA 4.0"
+  },
+  {
+   "name": "國考題的解說、申論評分要點與參考答案",
+   "basis": "AI 依教科書通說撰寫，非官方",
+   "license": "CC BY-SA 4.0"
+  }
  ]
 }
