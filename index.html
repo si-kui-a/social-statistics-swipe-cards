@@ -166,6 +166,15 @@ table.t td.n, table.t th.n { text-align: right; }
         <p class="small">今天的張數只算不同的卡，答錯重做不另計；最近 20 題答對不到一半時也會先停下，請先看分析。</p>
       </div>
     </details>
+    <details class="box" id="shareBox" hidden>
+      <summary>匿名回傳作答</summary>
+      <div class="stack">
+        <label class="check"><input id="shareOn" type="checkbox"> 匿名回傳我的作答，協助改善題目</label>
+        <p class="small">只送出：隨機匿名代碼、日期（不含時刻）、題目、對錯、有沒有把握、選了哪個選項或填的數字。不送申論與筆記文字，不需要帳號；成績照樣只存在手機。資料只用來找出太難、題意不清或答案有誤的題目。</p>
+        <p class="small" id="shareStatus"></p>
+        <button type="button" class="big" id="shareReset">換一個匿名代碼</button>
+      </div>
+    </details>
     <details class="box">
       <summary>怎麼用</summary>
       <div class="stack">
@@ -236,6 +245,11 @@ let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore 
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
 // Only right after answering: a time limit keeps it a mis-tap fix, not a way to retry until right.
 const UNDO_MS = 8000;
+// Anonymous sharing (opt-in): the Apps Script web app that receives the rows (apps-script/Code.gs).
+/// Empty until it is deployed: then nothing is asked and nothing is sent. let, so the layout check can
+// point it at a stub.
+let SHARE_URL = "";
+const SHARE_KEY = "swipe-share", SHARE_QUEUE = "swipe-share-queue", SHARE_QUEUE_MAX = 2000, SHARE_BATCH = 200;
 let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
@@ -542,6 +556,7 @@ function summaryHtml(r) {
     <p class="small">有把握卻答錯 <b>${s.sureWrong.length}</b> 張（最該弄懂的觀念）・不確定但答對 ${s.unsureRight} 張（明天再複習）</p>
     ${analysisHtml(r)}
     ${domainTableHtml(r)}
+    ${sharePromptHtml()}
     ${left}<p class="hint">每一輪的成績都記在「☰ → 成績」，也會跟著「匯出成績」存下來。</p>`;
 }
 
@@ -593,9 +608,51 @@ function examTick() {
 }
 
 // The end of a round is written to the history once, with what the summary screen shows.
+// Sharing settings span both decks: { on, asked, install }. Storage may be blocked; then nothing is shared.
+function share() { try { return JSON.parse(localStorage.getItem(SHARE_KEY) || "null") || {}; } catch (e) { return {}; } }
+function setShare(s) { try { localStorage.setItem(SHARE_KEY, JSON.stringify(s)); } catch (e) { /* not shared */ } }
+function shareQueue() { try { return JSON.parse(localStorage.getItem(SHARE_QUEUE) || "[]"); } catch (e) { return []; } }
+function setShareQueue(q) { try { localStorage.setItem(SHARE_QUEUE, JSON.stringify(q.slice(-SHARE_QUEUE_MAX))); } catch (e) { /* dropped */ } }
+function hex16() { const b = new Uint8Array(8); crypto.getRandomValues(b); return [...b].map(x => x.toString(16).padStart(2, "0")).join(""); }
+function chooseShare(on) {
+  const s = share();
+  setShare({ ...s, on, asked: true, install: s.install || hex16() });
+  if (!on) setShareQueue([]);
+  flushShare();
+}
+// Queues one attempt; returns its id so undo can take it back before it is sent.
+function queueShare(card, entry, first) {
+  const s = share();
+  if (!SHARE_URL || !s.on || !s.install) return null;
+  const row = Engine.shareRow(deckId, { ...card, format: format(card) }, entry, first, hex16(), s.install);
+  setShareQueue([...shareQueue(), row]);
+  return row.id;
+}
+// Sends queued rows when online; a failed or unreadable reply keeps them for next time (the pull
+// script drops duplicates by id), so a flaky connection never loses or double-counts an attempt.
+let sharing = false;
+async function flushShare() {
+  const q = shareQueue();
+  if (sharing || !SHARE_URL || !share().on || !q.length || !navigator.onLine) return;
+  sharing = true;
+  try {
+    const batch = q.slice(0, SHARE_BATCH);
+    const res = await fetch(SHARE_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ v: 1, rows: batch }) });
+    const reply = await res.json();
+    if (reply.ok) { const sent = new Set(batch.map(r => r.id)); setShareQueue(shareQueue().filter(r => !sent.has(r.id))); }
+  } catch (e) { /* offline or refused: try again later */ }
+  sharing = false;
+}
+function sharePromptHtml() {
+  if (!SHARE_URL || share().asked) return "";
+  return `<div class="a"><div class="label">要匿名回傳作答嗎？</div><p class="small">只送題目、對錯、有沒有把握與選了哪個選項（不含時刻與文字、不需要帳號），用來找出題意不清或答案有誤的題目。之後可在「☰ → 匿名回傳作答」更改。</p>
+    <div class="actions"><button type="button" class="big" data-share="0">不要</button><button type="button" class="big sure" data-share="1">加入</button></div></div>`;
+}
+
 function finishRound() {
   if (!round || round.done || !round.results.length) return;
   round.done = true;
+  flushShare();
   const s = Engine.summarize(round.results);
   round.ended = Date.now();
   clearInterval(examTicker);
@@ -660,6 +717,7 @@ function record(score) {
   startUndoClock();
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
   const f = format(c), entry = Engine.attempt(now, right, sure, score, f === "mc" ? picked : f === "num" ? typed : "");
+  undo.shareId = queueShare(c, entry, !p.log.length);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   Engine.updateAbility(state.model, c, score);
   if (round && !round.results.some(r => r.id === c.id)) {
@@ -694,6 +752,7 @@ function undoLast() {
   clearInterval(undoTicker);
   if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
   const u = undo; undo = null; paused = null; $("undo").hidden = true;
+  if (u.shareId) setShareQueue(shareQueue().filter(r => r.id !== u.shareId));
   const old = JSON.parse(u.state);
   Object.keys(state).forEach(k => delete state[k]); Object.assign(state, old);
   round = state.rounds[roundKey] || null;
@@ -753,6 +812,8 @@ window.addEventListener("pointerup", e => {
 window.addEventListener("pointercancel", () => { if (drag) { drag = null; resetDrag(); } });
 
 $("card").addEventListener("click", e => {
+  const yes = e.target.closest("[data-share]");
+  if (yes) { chooseShare(yes.dataset.share === "1"); return render(); }
   const b = e.target.closest(".choice");
   if (b && phase === "front") { picked = b.dataset.k; saveDraft(); render(); }
 });
@@ -835,9 +896,17 @@ function renderScores() {
     <table class="t"><tr><th>章節</th><th class="n">熟練</th><th class="n">學習中</th><th class="n">未做</th></tr>${mast}</table>`;
 }
 $("openMenu").addEventListener("click", () => {
-  renderScores(); $("dailyMax").value = ui().dailyMax;
+  renderScores(); $("dailyMax").value = ui().dailyMax; renderShare();
   $("menuTitle").textContent = `${D().title}・選單`; $("menu").showModal();
 });
+function renderShare() {
+  const s = share();
+  $("shareBox").hidden = !SHARE_URL;
+  $("shareOn").checked = !!s.on;
+  $("shareStatus").textContent = s.on ? `匿名代碼 ${s.install}・待送 ${shareQueue().length} 筆` : "目前不回傳。";
+}
+$("shareOn").addEventListener("change", e => { chooseShare(e.target.checked); renderShare(); });
+$("shareReset").addEventListener("click", () => { setShare({ ...share(), install: hex16() }); setShareQueue([]); renderShare(); });
 $("dailyMax").addEventListener("change", e => {
   const v = Math.round(Number(e.target.value));
   ui().dailyMax = Number.isFinite(v) ? Math.min(300, Math.max(10, v)) : Engine.DAILY_MAX;
@@ -944,6 +1013,7 @@ $("undoImport").addEventListener("click", () => {
 
 function showOnline() { $("offline").textContent = navigator.onLine ? "" : "目前離線：可以照常練習，成績存在手機裡。"; }
 window.addEventListener("online", showOnline);
+window.addEventListener("online", flushShare);
 window.addEventListener("offline", showOnline);
 
 function renderDecks() {
@@ -979,6 +1049,7 @@ async function start() {
   let saved = "stats";
   try { saved = localStorage.getItem(DECK_KEY) || "stats"; } catch (e) { /* storage blocked */ }
   await openDeck(saved);
+  flushShare();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }

@@ -177,6 +177,29 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("interleave: no domain twice in a row when avoidable", !/(.)\1/.test(order) && order.length === 6);
 }
 
+// anonymous sharing: what the app sends is exactly what the Apps Script accepts
+{
+  const fs = require("fs"), vm = require("vm"), path = require("path");
+  const gs = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "apps-script", "Code.gs"), "utf8"), gs);
+  const id = "0123456789abcdef", install = "fedcba9876543210";
+  const t = new Date(2026, 9, 14, 23, 59).getTime();
+  const mc = E.shareRow("stats", { id: "c04-bank-1a2b3c4d", format: "mc", level: 2 }, [t, 1, 0, 1, "C"], true, id, install);
+  ok("share: day only, no time of day", mc.day === "2026-10-14" && !JSON.stringify(mc).includes(String(t)));
+  ok("share: letter picked kept", mc.answer === "C" && mc.first === 1 && mc.level === 2);
+  const essay = E.shareRow("research", { id: "e-1", format: "essay" }, [t, 0, 1, 0.4, "我的名字是…"], false, id, install);
+  ok("share: written text never sent", essay.answer === "" && essay.score === 0.4 && essay.level === 2);
+  const flip = E.shareRow("stats", { id: "f-1" }, [t, 1, 1], false, id, install);
+  ok("share: old three-field attempts", flip.score === 1 && flip.answer === "");
+  ok("share: Apps Script accepts every row the app makes", [mc, essay, flip].every(gs.validRow));
+  ok("share: extra field refused", !gs.validRow({ ...mc, name: "x" }));
+  ok("share: missing field refused", !gs.validRow((({ answer, ...rest }) => rest)(mc)));
+  ok("share: bad install code refused", !gs.validRow({ ...mc, install: "Alice" }));
+  ok("share: long answer refused", !gs.validRow({ ...mc, answer: "x".repeat(41) }));
+  const mixed = gs.acceptedRows({ rows: [mc, { ...flip, install: "1111111111111111" }, { ...essay, right: 2 }] });
+  ok("share: one install code per request, invalid rows dropped", mixed.length === 1 && mixed[0] === mc);
+}
+
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
