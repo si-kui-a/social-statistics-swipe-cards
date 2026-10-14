@@ -106,7 +106,82 @@
   // misconception most worth fixing, after RETRY_SOON cards; an unsure one at the end.
   function retryAt(queueLength, sure) { return sure ? Math.min(RETRY_SOON, queueLength) : queueLength; }
 
-  // Seen cards that are due (or all seen ones), then unseen cards closest to TARGET success, up to cap.
+  // Standing per domain (a card's label: a chapter or topic) over the whole history, in Khan Academy's
+  // skill levels over the last LEVEL_WINDOW attempts: 未開始 (never answered), 嘗試 (under FAMILIAR
+  // right), 熟悉, 精熟 (all right). Fewer than MIN_SAMPLE attempts is too little to call a domain weak
+  // or strong, so it stays 嘗試 with sparse set and no error rate.
+  const LEVEL_WINDOW = 10, MIN_SAMPLE = 3, FAMILIAR = 0.7;
+  function domainOf(card) { return card.label || card.chapter; }
+  function domainStats(cards, progress) {
+    const by = new Map();
+    for (const c of cards) {
+      const d = domainOf(c), b = by.get(d) || { label: d, cards: 0, log: [] };
+      b.cards++;
+      b.log.push(...((progress[c.id] || {}).log || []));
+      by.set(d, b);
+    }
+    return [...by.values()].map(b => {
+      const recent = b.log.sort((x, y) => x[0] - y[0]).slice(-LEVEL_WINDOW);
+      const n = recent.length, wrong = recent.filter(e => !e[1]).length, sparse = n < MIN_SAMPLE;
+      const level = !n ? "未開始" : sparse || (n - wrong) / n < FAMILIAR ? "嘗試" : wrong ? "熟悉" : "精熟";
+      return { label: b.label, cards: b.cards, n, wrong, err: sparse ? null : wrong / n, sparse, level };
+    });
+  }
+
+  // New cards shared out by domain, most deserving slot first (D'Hondt): a domain's weight grows with
+  // its recent error rate, and a weak domain gives its basic cards first, as ALEKS teaches what a topic
+  // builds on before the topic. No domain takes more than half the slots while another can still give
+  // a card (interleaved practice beats blocks of one topic); only when the others run out does it fill
+  // the rest, so a round is never cut short. A domain without enough evidence counts as NEUTRAL_ERR.
+  const WEAK_WEIGHT = 2, NEUTRAL_ERR = 0.3, WEAK_ERR = 0.3;
+  function pickFresh(ranked, stats, cap) {
+    const info = new Map(stats.map(s => [s.label, s]));
+    const err = d => { const s = info.get(d); return s && !s.sparse ? s.err : NEUTRAL_ERR; };
+    const pools = new Map();
+    for (const c of ranked) { const d = domainOf(c); if (!pools.has(d)) pools.set(d, []); pools.get(d).push(c); }
+    for (const [d, list] of pools) if (err(d) >= WEAK_ERR && !(info.get(d) || { sparse: true }).sparse) list.sort((a, b) => level(a) - level(b));
+    const taken = new Map(), out = [];
+    const fill = limit => {
+      while (out.length < cap) {
+        let best = null, bestQ = -1;
+        for (const [d, list] of pools) {
+          const t = taken.get(d) || 0;
+          if (t >= list.length || t >= limit) continue;
+          const q = (1 + WEAK_WEIGHT * err(d)) / (t + 1);
+          if (q > bestQ) { best = d; bestQ = q; }
+        }
+        if (best === null) return;
+        const t = taken.get(best) || 0;
+        out.push(pools.get(best)[t]); taken.set(best, t + 1);
+      }
+    };
+    fill(pools.size > 1 ? Math.ceil(cap / 2) : Infinity);
+    fill(Infinity);
+    return out;
+  }
+
+  // A round's order with the same domain twice in a row only when nothing else is left: each step takes
+  // the first card (in the given, shuffled order) from the domain with the most cards remaining.
+  function interleave(list) {
+    const rest = list.slice(), left = new Map(), out = [];
+    for (const c of rest) left.set(domainOf(c), (left.get(domainOf(c)) || 0) + 1);
+    while (rest.length) {
+      const prev = out.length ? domainOf(out[out.length - 1]) : null;
+      let pick = -1;
+      for (let i = 0; i < rest.length; i++) {
+        const d = domainOf(rest[i]);
+        if (d !== prev && (pick < 0 || left.get(d) > left.get(domainOf(rest[pick])))) pick = i;
+      }
+      if (pick < 0) pick = 0;
+      const c = rest.splice(pick, 1)[0];
+      left.set(domainOf(c), left.get(domainOf(c)) - 1);
+      out.push(c);
+    }
+    return out;
+  }
+
+  // Seen cards that are due (or all seen ones), then unseen cards closest to TARGET success, up to cap,
+  // shared out by domain (pickFresh).
   function buildRound(cards, state, opts) {
     const now = opts.now, progress = state.progress, model = state.model || {};
     const seen = cards.filter(c => progress[c.id] && (opts.ignoreDue || progress[c.id].due <= now));
@@ -114,7 +189,7 @@
     const fresh = cards.filter(c => !progress[c.id])
       .map(c => ({ c, d: Math.abs(expected(theta(model, c), c) - TARGET) + rand() * 0.15 }))
       .sort((a, b) => a.d - b.d).map(x => x.c);
-    return { seen, fresh: fresh.slice(0, opts.cap) };
+    return { seen, fresh: pickFresh(fresh, domainStats(cards, progress), opts.cap) };
   }
 
   function recentScores(progress, limit) {
@@ -309,6 +384,6 @@
   }
 
   const Engine = { EXPORT_VERSION, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

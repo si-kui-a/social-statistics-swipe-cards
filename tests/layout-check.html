@@ -106,6 +106,10 @@
     if (W.eval("current") !== null || !W.eval("round.done")) failures.push(`after ${total}/${total} first attempts the round went on with retries`);
     if (!/繼續複習答錯的（/.test(D.getElementById("actions").textContent)) failures.push("round end offers no 繼續複習答錯的");
     if (!/易錯領域|錯在哪裡/.test(D.querySelector("#card").textContent)) failures.push("round end shows no analysis");
+    seen.push("stop/round end shows error rate by domain");
+    if (!/錯誤率[\s\S]*長期[\s\S]*嘗試/.test(D.querySelector("#card").textContent)) failures.push("round end shows no error rate and level by domain");
+    const table = D.querySelector("#card table.t");
+    if (table && table.getBoundingClientRect().right > W.innerWidth + 1) failures.push(`domain table overflows the screen (${Math.round(table.getBoundingClientRect().right)} > ${W.innerWidth})`);
     seen.push("stop/today counts cards, not retries");
     if (!new RegExp(`今天 ${total}/300 張`).test(D.getElementById("today").textContent)) failures.push(`today line: ${D.getElementById("today").textContent}`);
     W.eval("localStorage.clear(); load();");
@@ -120,6 +124,8 @@
     for (let i = 0; i < 20; i++) W.eval("sure = 1; ans(false)");
     seen.push("stop/a run of misses pauses");
     if (W.eval("typeof paused !== \"undefined\" && paused && paused.code") !== "low") failures.push("no pause after 20 misses in a row");
+    seen.push("stop/pause shows error rate by domain");
+    if (!/錯誤率/.test(D.querySelector("#card").textContent)) failures.push("pause shows no error rate by domain");
     // Mock exam: no right/wrong shown while it runs, written answers graded after hand-in, score by
     // section at the end, and time-up hands the paper in.
     W.eval("localStorage.clear(); load();");

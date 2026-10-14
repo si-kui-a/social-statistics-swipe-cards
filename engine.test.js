@@ -152,6 +152,31 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("exam: score by section", s.bySection.map(b => `${b.label}${b.right}/${b.n}`).join() === "選擇1/2,計算1/1");
 }
 
+// domains: long-term level, error-weighted new cards, interleaving
+{
+  const log = bits => ({ box: 0, due: 0, log: bits.map((b, i) => [i, b, 1]) });
+  const dc = [{ id: "a1", label: "A" }, { id: "a2", label: "A" }, { id: "b1", label: "B" }, { id: "c1", label: "C" }, { id: "d1", label: "D" }];
+  const st = E.domainStats(dc, { a1: log([1, 1, 0]), a2: log([1]), b1: log([1, 1, 1]), c1: log([1, 0]) });
+  const by = Object.fromEntries(st.map(s => [s.label, s]));
+  ok("domain: attempts pooled over a domain's cards", by.A.n === 4 && by.A.wrong === 1 && by.A.err === 0.25 && by.A.level === "熟悉");
+  ok("domain: all right is 精熟", by.B.level === "精熟");
+  ok("domain: under MIN_SAMPLE is sparse, no rate", by.C.sparse && by.C.err === null && by.C.level === "嘗試");
+  ok("domain: never answered", by.D.level === "未開始" && by.D.n === 0);
+  ok("domain: only the last 10 attempts", E.domainStats([{ id: "x", label: "X" }], { x: log([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]) })[0].level === "精熟");
+  const weak = { label: "W", sparse: false, err: 0.8 }, fine = { label: "F", sparse: false, err: 0 };
+  const ranked = [];
+  for (let i = 0; i < 10; i++) ranked.push({ id: "f" + i, label: "F", level: 2 }, { id: "w" + i, label: "W", level: i < 5 ? 2 : 1 });
+  const got = E.pickFresh(ranked, [weak, fine], 8);
+  const nW = got.filter(c => c.label === "W").length;
+  ok("pickFresh: weak domain gets more slots, at most half", nW === 4 && got.length === 8);
+  ok("pickFresh: weak domain gives basic cards first", got.filter(c => c.label === "W").every(c => c.level === 1));
+  ok("pickFresh: fills from one domain when the others run out", E.pickFresh(ranked.filter(c => c.label === "W").concat(ranked[0]), [weak, fine], 6).length === 6);
+  ok("pickFresh: one domain keeps the ranked order", E.pickFresh(ranked.filter(c => c.label === "F"), [], 3).map(c => c.id).join() === "f0,f1,f2");
+  const mixed = ["A", "A", "A", "B", "B", "C"].map((label, i) => ({ id: i, label }));
+  const order = E.interleave(mixed).map(c => c.label).join("");
+  ok("interleave: no domain twice in a row when avoidable", !/(.)\1/.test(order) && order.length === 6);
+}
+
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
