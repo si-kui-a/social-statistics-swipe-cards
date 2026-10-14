@@ -75,6 +75,13 @@ blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); 
 /* Wide tables (e.g. regression output) scroll on their own instead of the whole card. */
 pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; }
 .a { border-top: 1px dashed var(--line); padding-top: 12px; }
+.progress-box { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
+.prog-line { margin: 4px 0; font-size: .9rem; }
+.tier { white-space: nowrap; font-weight: 700; padding: 0 6px; border-radius: 6px; border: 1px solid currentColor; }
+.t-穩 { color: var(--right); } .t-注意 { color: var(--accent); } .t-危險 { color: var(--wrong); }
+.voice { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--line); font-size: .88rem; }
+.voice cite { display: block; font-style: normal; font-size: .75rem; color: var(--muted); }
+.report { font-size: .78rem; color: var(--muted); align-self: flex-end; }
 .a .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
 .hint { font-size: .85rem; color: var(--muted); margin: auto 0 0; }
 .stamp { position: absolute; top: 18px; font-family: var(--font-display); font-size: 1.3rem; padding: 2px 10px;
@@ -257,7 +264,7 @@ table.t td.n, table.t th.n { text-align: right; }
           <dt>AI 解說</dt><dd>解說、評分要點由 AI 撰寫，非官方</dd>
           <dt>每張卡</dt><dd>翻面後的「出處」列出年度、考試或教材</dd>
           <dt>本站授權</dt><dd>自編內容 CC BY-SA 4.0：可分享改寫，須標示出處並同授權</dd>
-          <dt>回報</dt><dd>著作權或題目疑慮請到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue，確認後立即移除</dd>
+          <dt>回報</dt><dd>每張卡翻面後按「回報這題有誤或有疑慮」，或到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue；確認後立即修正或移除</dd>
         </dl>
         <h4 class="facts-head" id="sourcesTitle">本題庫的來源</h4>
         <ul class="sources" id="deckSources"></ul>
@@ -296,6 +303,8 @@ let paused = null;
 let misconceptions = {};
 // Mock exams from the deck file (exams[]): fixed sections, a time limit, no feedback until the end.
 let exams = [], examTicker = null;
+// Fictional comments in a theorist's voice per group (deck file "voices"), shown with the exam progress.
+let voices = {};
 // phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
@@ -603,6 +612,35 @@ function examSummaryHtml(r) {
     ${ex.note ? `<p class="hint">${esc(ex.note)}</p>` : ""}`;
 }
 
+// Exam progress at the end of a round (改善規劃.md stage A): the selected scope when it has an exam date
+// still ahead, else the nearest dated scope. Reads only what the phone already holds; stores nothing.
+function progressScope() {
+  const today = dayStart(), dated = scopes.filter(s => s.date && new Date(`${s.date}T23:59:59`).getTime() >= today);
+  return dated.find(s => s.id === ui().scope) || dated.sort((a, b) => a.date < b.date ? -1 : 1)[0];
+}
+function voiceFor(r, scopeCards) {
+  const count = new Map();
+  for (const x of r.results) if (!x.right) { const g = (byId(x.id) || {}).group; if (g) count.set(g, (count.get(g) || 0) + 1); }
+  if (!count.size) for (const c of scopeCards) if (c.group) count.set(c.group, (count.get(c.group) || 0) + 0.001);
+  const group = [...count.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).find(g => voices[g]);
+  return group ? voices[group] : null;
+}
+function progressHtml(r) {
+  const s = progressScope();
+  if (!s) return "";
+  const inS = allCards().filter(c => scopeHas(s, c));
+  const p = Engine.examProgress(inS, state.progress, new Date(`${s.date}T23:59:59`).getTime());
+  const sureWrong = Engine.summarize(r.results).sureWrong.length;
+  const v = voiceFor(r, inS);
+  const say = v && (sureWrong >= 2 && v.sure ? v.sure : v[p.tier || "none"]);
+  const next = p.tier === "危險" ? `<p class="small">照目前的速度考前做不完：今天先做 ${p.perDay} 張，或把每日上限（☰ → 每日上限）調到 ${p.perDay} 張以上；也可以先縮小到最常錯的章節。</p>` : "";
+  return `<div class="progress-box"><div class="meta"><span>考試進度</span><span>${esc(s.title)}</span></div>
+    <p class="prog-line"><b>還有 ${p.daysLeft} 天</b>｜未熟悉或考前到期 ${p.work} 張｜${p.tier
+      ? `<span class="tier t-${p.tier}">危機：${p.tier}</span>` : "還沒有作答紀錄，暫不判斷危機度"}｜今天建議 ${p.perDay} 張${p.tier ? `（近 7 天每天約 ${p.pace} 張）` : ""}</p>
+    ${p.unstable ? `<p class="small">近 7 天只有 ${p.activeDays} 天有作答，速度估計不穩。</p>` : ""}${next}
+    ${say ? `<blockquote class="voice">「${esc(say)}」<cite>虛構評語：以${esc(v.name)}口吻撰寫，非本人言論</cite></blockquote>` : ""}</div>`;
+}
+
 function summaryHtml(r) {
   if (r.exam) return examSummaryHtml(r);
   const s = Engine.summarize(r.results);
@@ -610,6 +648,7 @@ function summaryHtml(r) {
   return `<div class="meta"><span>本輪完成</span><span>${esc(r.label)}</span></div>
     <div class="score">${s.right} / ${s.n}　<span class="result ${s.pct >= 75 ? "ok" : "bad"}">${s.pct}%</span></div>
     <p class="small">有把握卻答錯 <b>${s.sureWrong.length}</b> 張（最該弄懂的觀念）・不確定但答對 ${s.unsureRight} 張（明天再複習）</p>
+    ${progressHtml(r)}
     ${analysisHtml(r)}
     ${domainTableHtml(r)}
     ${sharePromptHtml()}
@@ -645,6 +684,7 @@ function render() {
     ${answerBody(c)}
     ${result}
     ${showAnswer && c.a ? `<div class="a"><div class="label">${f === "essay" ? "參考答案" : "答案與說明"}</div>${md(c.a)}</div>` : ""}
+    ${showAnswer && c.kind !== "mine" ? `<a class="report" href="${esc(reportUrl(c))}" target="_blank" rel="noopener">回報這題有誤或有疑慮</a>` : ""}
     <p class="hint">${phase === "front" ? HINT[f] : ""}</p></div>${workArea(c)}`;
   setActions();
 }
@@ -1079,6 +1119,16 @@ function renderDecks() {
   document.title = `${D().title}滑卡`;
 }
 
+// A problem report opens a prefilled GitHub issue (2026-10-15 plan item 2): the card id makes the
+// 出處與著作權 promise to fix or remove a card workable. The text sent is only what the card shows.
+const REPO_ISSUES = "https://github.com/si-kui-a/social-statistics-swipe-cards/issues/new";
+function reportUrl(c) {
+  const title = `[${D().title}] ${c.id}：`;
+  const body = [`題庫：${D().title}`, `卡片：${c.id}（${c.label || c.chapter}）`, `題目開頭：${String(c.q).slice(0, 80)}`, "",
+    "問題（答案有誤、題意不清、出處或著作權疑慮…）：", ""].join("\n");
+  return `${REPO_ISSUES}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
+
 // The deck file names its sources (each course repository's exporter writes "sources"), shown under 出處與著作權.
 function renderSources(list) {
   $("sourcesTitle").textContent = `「${D().title}」的來源`;
@@ -1095,9 +1145,9 @@ async function openDeck(id) {
   renderDecks(); load(); showUndoImport();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
-    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || [];
+    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || []; voices = doc.voices || {};
     renderSources(doc.sources || []);
-  } catch (e) { deck = []; scopes = []; renderSources([]); }
+  } catch (e) { deck = []; scopes = []; voices = {}; renderSources([]); }
   const u = ui();
   if (!scopes.some(s => s.id === u.scope)) u.scope = "all";
   const known = new Set(allCards().map(c => c.chapter));

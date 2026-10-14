@@ -200,6 +200,26 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("share: one install code per request, invalid rows dropped", mixed.length === 1 && mixed[0] === mc);
 }
 
+// exam progress (stage A): tiers fixed in advance, no tier without history, sure-but-wrong lifts 穩 to 注意
+{
+  const D1 = E.DAY, now = 100 * D1, exam = now + 10 * D1;
+  const cards = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+  const none = E.examProgress(cards, {}, exam, now);
+  ok("progress: no history gives no tier", none.tier === null && none.work === 4 && none.daysLeft === 10);
+  // 2 cards a day for 7 days -> pace 2; work 4 over 10 days -> ratio 0.2 -> 穩
+  const log = d => [[now - d * D1, 1, 0]];
+  const calm = { a: { box: 1, due: now, log: [...log(1), ...log(2), ...log(3)] }, b: { box: 3, due: exam + D1, log: log(1) },
+    x: { box: 1, due: now, log: [...log(1), ...log(2), ...log(3), ...log(4), ...log(5), ...log(6)] } };
+  const p = E.examProgress(cards, calm, exam, now);
+  ok("progress: work counts unmastered and due-before-exam cards", p.notLearned === 3 && p.dueBefore === 0 && p.work === 3);
+  ok("progress: pace is distinct cards per day over 7 days", p.pace === 1.4 && p.tier === "穩" && !p.unstable);
+  const sureWrong = { ...calm, a: { ...calm.a, log: [[now - D1, 0, 1], [now - 2 * D1, 0, 1]] } };
+  ok("progress: sure-but-wrong over 20% is at least 注意", E.examProgress(cards, sureWrong, exam, now).tier === "注意");
+  const late = E.examProgress(cards, { a: { box: 1, due: now, log: log(1) } }, now + D1, now);
+  ok("progress: more work than capacity is 危險", late.tier === "危險" && late.perDay === 4 && late.unstable);
+  ok("progress: exam passed gives 0 days", E.examProgress(cards, calm, now - D1, now).daysLeft === 0);
+}
+
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
