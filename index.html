@@ -341,7 +341,7 @@ function newRound(opts = {}) {
     state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
     const r = Engine.buildRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue });
     review = r.seen.length;
-    list = shuffle(r.seen.concat(r.fresh));
+    list = Engine.interleave(shuffle(r.seen.concat(r.fresh)));
   }
   return { pace, label, started: now, total: list.length, review, ids: list.map(c => c.id),
            current: null, results: [], retried: [], done: false, retry: !!opts.ids, exam };
@@ -494,11 +494,25 @@ function analysisHtml(r) {
     list("錯在哪裡", diags) + list("常見誤解", traps) + list(`以為懂的卡（有把握卻答錯 ${s.sureWrong.length} 張）`, sure);
 }
 
+// Each domain in the round so far: answered, missed, error rate (樣本不足 under Engine.MIN_SAMPLE
+// answers, so one or two misses do not brand a domain weak), and its long-term level (Engine.domainStats).
+function domainTableHtml(r) {
+  const s = Engine.summarize(r.results);
+  if (!s.byLabel.length) return "";
+  const long = new Map(Engine.domainStats(allCards(), state.progress).map(d => [d.label, d.level]));
+  const rows = s.byLabel.map(b => {
+    const wrong = b.n - b.right, rate = b.n < Engine.MIN_SAMPLE ? "樣本不足" : `${Math.round(100 * wrong / b.n)}%`;
+    return `<tr><td>${esc(b.label)}</td><td class="n">${b.n}</td><td class="n">${wrong}</td><td class="n">${rate}</td><td>${long.get(b.label) || ""}</td></tr>`;
+  }).join("");
+  return `<table class="t"><tr><th>領域</th><th class="n">作答</th><th class="n">錯</th><th class="n">錯誤率</th><th>長期</th></tr>${rows}</table>
+    <p class="small">長期：最近 10 題，答對七成以上為熟悉、全對為精熟。下一輪會多排錯誤率高的領域，並先出它的基礎題。</p>`;
+}
+
 function pauseHtml(r) {
   const t = Engine.since(state.progress, dayStart());
   return `<div class="meta"><span>先停一下</span></div><div class="q">${esc(paused.text)}</div>
     <p class="small">今天 ${t.n} 張，首答答對 ${t.pct}%；最近 ${t.recentN} 題答對 ${t.recentPct}%。</p>
-    ${r && r.results.length ? `<p class="small">這一輪到目前：${r.results.filter(x => x.right).length} / ${r.results.length}</p>${analysisHtml(r)}` : ""}
+    ${r && r.results.length ? `<p class="small">這一輪到目前：${r.results.filter(x => x.right).length} / ${r.results.length}</p>${domainTableHtml(r)}${analysisHtml(r)}` : ""}
     <p class="hint">分開幾天練，比一次做很多張記得久；答錯很多時，先弄懂上面的問題再繼續。</p>`;
 }
 
@@ -520,13 +534,12 @@ function examSummaryHtml(r) {
 function summaryHtml(r) {
   if (r.exam) return examSummaryHtml(r);
   const s = Engine.summarize(r.results);
-  const rows = s.byLabel.map(b => `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${Math.round(100 * b.right / b.n)}%</td></tr>`).join("");
   const left = r.pace === "all" ? "" : `<p class="small">明天再回來：分開幾天複習，比一次做很多張記得久。</p>`;
   return `<div class="meta"><span>本輪完成</span><span>${esc(r.label)}</span></div>
     <div class="score">${s.right} / ${s.n}　<span class="result ${s.pct >= 75 ? "ok" : "bad"}">${s.pct}%</span></div>
     <p class="small">有把握卻答錯 <b>${s.sureWrong.length}</b> 張（最該弄懂的觀念）・不確定但答對 ${s.unsureRight} 張（明天再複習）</p>
     ${analysisHtml(r)}
-    ${rows ? `<table class="t"><tr><th>章節</th><th class="n">答對</th><th class="n">得分</th></tr>${rows}</table>` : ""}
+    ${domainTableHtml(r)}
     ${left}<p class="hint">每一輪的成績都記在「☰ → 成績」，也會跟著「匯出成績」存下來。</p>`;
 }
 
