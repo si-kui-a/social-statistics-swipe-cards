@@ -56,7 +56,11 @@ header .seg button { font-size: .95rem; padding: 6px; }
 .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; min-width: 40px; }
 .bar i { display: block; height: 100%; background: var(--accent); }
 .undo { flex: none; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); font: inherit; font-size: .8rem; cursor: pointer; }
-.stage { position: relative; min-height: 0; touch-action: pan-y; }
+/* Pinned to the last two rows: a hidden row above (the scope chips in a mock exam) otherwise shifts
+   every later child up one track, the card lands in an auto row of height 0 and the buttons take the
+   whole screen (2026-10-14: mock exams showed only the two answer buttons, on phone and desktop). */
+.stage { position: relative; min-height: 0; touch-action: pan-y; grid-row: -3 / -2; }
+.actions { grid-row: -2 / -1; }
 .card { position: absolute; inset: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 10px 28px rgb(0 0 0 / .08); display: flex; flex-direction: column;
   overflow: hidden; transition: transform .25s ease, opacity .25s ease; user-select: none; }

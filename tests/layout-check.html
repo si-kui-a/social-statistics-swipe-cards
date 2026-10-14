@@ -125,6 +125,9 @@
     W.eval("localStorage.clear(); load();");
     pick(`u => { u.pace = "exam"; u.exam = "mid-mini"; }`);
     seen.push("exam/runs without feedback");
+    // 2026-10-14: the hidden scope row shifted the grid and the card collapsed to 2px in every exam.
+    const cardH = D.getElementById("card").getBoundingClientRect().height;
+    if (cardH < 300) failures.push(`exam card collapsed to ${Math.round(cardH)}px high`);
     const n = W.eval("round.total");
     let shown = 0;
     for (let i = 0; i < n * 2 && W.eval("current && !round.exam.grading"); i++) {
