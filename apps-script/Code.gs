@@ -22,7 +22,7 @@ function validRow(r) {
   if (keys.length !== FIELDS.length || !keys.every(function (k) { return FIELDS.indexOf(k) >= 0; })) return false;
   var bit = function (x) { return x === 0 || x === 1; };
   return /^[0-9a-f]{16}$/.test(r.id) && /^[0-9a-f]{16}$/.test(r.install) &&
-    (r.deck === "stats" || r.deck === "research") && typeof r.card === "string" && /^[\w-]{1,40}$/.test(r.card) &&
+    (r.deck === "stats" || r.deck === "research" || r.deck === "theory") && typeof r.card === "string" && /^[\w-]{1,40}$/.test(r.card) &&
     typeof r.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.day) && bit(r.right) && bit(r.sure) &&
     typeof r.score === "number" && r.score >= 0 && r.score <= 1 &&
     typeof r.answer === "string" && r.answer.length <= 40 && bit(r.first) && [1, 2, 3].indexOf(r.level) >= 0;

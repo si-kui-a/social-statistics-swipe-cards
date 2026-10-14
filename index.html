@@ -101,6 +101,14 @@ textarea, select { font: inherit; color: var(--ink); background: var(--paper); b
 textarea { min-height: 70px; resize: vertical; }
 .status { font-size: .85rem; color: var(--muted); min-height: 1.2em; }
 .small { font-size: .85rem; color: var(--muted); margin: 0; }
+/* Menu help as term | one line, to scan rather than read (2026-10-14 request) */
+.facts { display: grid; grid-template-columns: minmax(4.5em, max-content) 1fr; gap: 4px 12px; margin: 0; font-size: .85rem; }
+.facts dt { font-weight: 700; }
+.facts dd { margin: 0; color: var(--muted); }
+.facts-head { margin: 4px 0 0; font-size: .9rem; }
+.sources { margin: 0; padding-left: 1.2em; font-size: .85rem; display: grid; gap: 6px; }
+.sources span { display: block; color: var(--muted); }
+.sources a { color: var(--accent); overflow-wrap: anywhere; }
 table.t { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
 table.t th, table.t td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
 table.t td.n, table.t th.n { text-align: right; }
@@ -162,15 +170,23 @@ table.t td.n, table.t th.n { text-align: right; }
     <details class="box">
       <summary>每日上限</summary>
       <div class="stack">
-        <label for="dailyMax">每天最多做幾張卡（到了會先停下，可選再做 20 張）<input id="dailyMax" type="number" min="10" max="300" step="10" inputmode="numeric"></label>
-        <p class="small">今天的張數只算不同的卡，答錯重做不另計；最近 20 題答對不到一半時也會先停下，請先看分析。</p>
+        <label for="dailyMax">每天最多幾張<input id="dailyMax" type="number" min="10" max="300" step="10" inputmode="numeric"></label>
+        <dl class="facts">
+          <dt>怎麼算</dt><dd>只算不同的卡，重做不另計</dd>
+          <dt>到上限</dt><dd>先停下，可選「再做 20 張」</dd>
+          <dt>錯太多</dt><dd>近 20 題對不到一半也會停下，先看分析</dd>
+        </dl>
       </div>
     </details>
     <details class="box" id="shareBox" hidden>
       <summary>匿名回傳作答</summary>
       <div class="stack">
         <label class="check"><input id="shareOn" type="checkbox"> 匿名回傳我的作答，協助改善題目</label>
-        <p class="small">只送出：隨機匿名代碼、日期（不含時刻）、題目、對錯、有沒有把握、選了哪個選項或填的數字。不送申論與筆記文字，不需要帳號；成績照樣只存在手機。資料只用來找出太難、題意不清或答案有誤的題目。</p>
+        <dl class="facts">
+          <dt>會送</dt><dd>匿名代碼、日期（無時刻）、題目、對錯、把握、選項或數字</dd>
+          <dt>不送</dt><dd>申論與筆記文字；不需要帳號</dd>
+          <dt>用途</dt><dd>找出太難、題意不清或答案有誤的題目</dd>
+        </dl>
         <p class="small" id="shareStatus"></p>
         <button type="button" class="big" id="shareReset">換一個匿名代碼</button>
       </div>
@@ -178,13 +194,31 @@ table.t td.n, table.t th.n { text-align: right; }
     <details class="box">
       <summary>怎麼用</summary>
       <div class="stack">
-        <p class="small"><b>作答</b>：選擇題點選答案、計算題輸入數字、申論題寫下答案後，選「有把握」或「不確定」送出，App 自動批改；申論題送出後勾選自己寫到的評分要點。問答卡可先寫答案再翻面，往右滑＝答對、往左滑＝答錯。答錯或按錯時，8 秒內可按「↶ 反悔」重答。</p>
-        <p class="small"><b>排程複習</b>：每輪只出到期的複習卡加上適量新卡，答對的卡依 1、3、7、14、30 天再出現；適合每天練一點。<b>全部刷完</b>：所選範圍每張卡各出一次，可以一路滑到底，中途離開下次接著做。</p>
-        <p class="small"><b>單章</b>：點一個章節只練那一章。<b>多章混合</b>：可點選多個章節一起練，「全部」就是範圍內所有章節混在一起。每個選法各自記住進度，切換章節再回來會接著原本那一輪。</p>
-        <p class="small"><b>上方數字</b>：「本輪 7/20」是這一輪已作答／總張數，只算第一次作答；「今天 32/60 張・首答 48%」是今天做過的不同卡片數／每日上限，以及每張卡今天第一次作答的答對率，不受章節切換影響。選「有把握」卻答錯的，隔 3 張就再出現一次。</p>
-        <p class="small"><b>模擬考</b>：選「模擬考」再選一份考卷，照大題順序作答、有時間限制，作答中不顯示對錯；簡答在交卷後自己批改，申論依關鍵字評分。時間到自動交卷，結束後看各大題得分與分析，可以「檢討答錯的」或「再考一次」。考卷配置依課綱與作業推估。</p>
-        <p class="small"><b>自動停下</b>：每張卡都答過一次，這一輪就結束，顯示得分與分析，再由你選「繼續複習答錯的」或「再練一輪」。今天做到每日上限（☰ → 每日上限），或最近 20 題答對不到一半，也會先停下，可以選再做 20 張或今天到此為止。</p>
-        <p class="small"><b>分析</b>：列出易錯的章節與題型、錯在哪裡（例如計算題把比例寫成百分比、選擇題選了常見誤解、有把握卻答錯），每一項附一個「先想」的問題：先自己想，再看解說。</p>
+        <h4 class="facts-head">作答</h4>
+        <dl class="facts">
+          <dt>選擇・計算・申論</dt><dd>作答後按「有把握／不確定」送出，自動批改</dd>
+          <dt>申論</dt><dd>送出後勾選自己寫到的評分要點</dd>
+          <dt>問答卡</dt><dd>翻面自評：右滑答對、左滑答錯</dd>
+          <dt>按錯了</dt><dd>8 秒內按「↶ 反悔」</dd>
+        </dl>
+        <h4 class="facts-head">出題方式</h4>
+        <dl class="facts">
+          <dt>排程複習</dt><dd>到期複習卡＋新卡；答對後隔 1、3、7、14、30 天再出現</dd>
+          <dt>全部刷完</dt><dd>範圍內每張各一次，中途離開下次接著做</dd>
+          <dt>單章／多章</dt><dd>只練一章或幾章混合；各自記住進度</dd>
+          <dt>模擬考</dt><dd>限時、不顯示對錯；交卷後看各大題得分</dd>
+        </dl>
+        <h4 class="facts-head">畫面數字</h4>
+        <dl class="facts">
+          <dt>本輪 7/20</dt><dd>本輪已答／總張數（只算第一次作答）</dd>
+          <dt>今天 32/60</dt><dd>今天做過的不同卡／每日上限，加首答答對率</dd>
+        </dl>
+        <h4 class="facts-head">停下與分析</h4>
+        <dl class="facts">
+          <dt>自動停下</dt><dd>一輪答完、到每日上限，或近 20 題錯一半</dd>
+          <dt>有把握卻錯</dt><dd>隔 3 張再出一次</dd>
+          <dt>分析</dt><dd>易錯章節與錯因，各附一個「先想」的問題</dd>
+        </dl>
       </div>
     </details>
     <details class="box">
@@ -200,12 +234,33 @@ table.t td.n, table.t th.n { text-align: right; }
     <details class="box">
       <summary>成績備份與搬移</summary>
       <div class="stack">
-        <p class="small">成績只存在這支手機的這個 App 裡，不會上傳。每週按一次「匯出成績」，把檔案存到雲端硬碟或傳給自己；換手機時用「匯入成績」還原。</p>
+        <dl class="facts">
+          <dt>存在哪</dt><dd>只在這支手機，不會上傳</dd>
+          <dt>建議</dt><dd>每週匯出一次，存到雲端或傳給自己</dd>
+          <dt>換手機</dt><dd>用「匯入成績」還原</dd>
+        </dl>
         <button class="big sure" id="export" type="button">匯出成績</button>
         <button class="big" id="copy" type="button">複製成績文字</button>
         <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
         <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
         <div class="status" id="backupStatus"></div>
+      </div>
+    </details>
+    <details class="box" id="sourcesBox">
+      <summary>出處與著作權</summary>
+      <div class="stack">
+        <h4 class="facts-head">規範</h4>
+        <dl class="facts">
+          <dt>國考試題</dt><dd>依法令舉行的考試試題，著作權法第 9 條不受保護</dd>
+          <dt>開放教材</dt><dd>依原授權改寫並標明出處；CC BY-SA 須以同授權分享</dd>
+          <dt>自編題目</dt><dd>只依讀本章節出題，不收教科書原文與原題</dd>
+          <dt>AI 解說</dt><dd>解說、評分要點由 AI 撰寫，非官方</dd>
+          <dt>每張卡</dt><dd>翻面後的「出處」列出年度、考試或教材</dd>
+          <dt>本站授權</dt><dd>自編內容 CC BY-SA 4.0：可分享改寫，須標示出處並同授權</dd>
+          <dt>回報</dt><dd>著作權或題目疑慮請到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue，確認後立即移除</dd>
+        </dl>
+        <h4 class="facts-head" id="sourcesTitle">本題庫的來源</h4>
+        <ul class="sources" id="deckSources"></ul>
       </div>
     </details>
     <p class="small" id="offline"></p>
@@ -214,7 +269,7 @@ table.t td.n, table.t th.n { text-align: right; }
 
 <script src="engine.js"></script>
 <script>
-const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", exam: "國考選擇題", tool: "軟體操作", mine: "自製" };
+const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", open: "開放教材", exam: "國考選擇題", tool: "軟體操作", mine: "自製" };
 // Only what the buttons and labels do not already say; the line also carries "answer first" prompts.
 const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip: "" };
 // Each deck keeps its own cards, progress, ability estimates and exports, so the subjects never mix.
@@ -223,6 +278,7 @@ const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip
 const DECKS = {
   stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1", newStart: 15 },
   research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newStart: 20 },
+  theory: { title: "社會學理論", file: "cards-theory.json", key: "swipe-cards-theory-v1", newStart: 15 },
 };
 const DECK_KEY = "swipe-cards-deck";
 const KEEP_ROUNDS = 12, KEEP_HISTORY = 60;
@@ -1023,6 +1079,14 @@ function renderDecks() {
   document.title = `${D().title}滑卡`;
 }
 
+// The deck file names its sources (each course repository's exporter writes "sources"), shown under 出處與著作權.
+function renderSources(list) {
+  $("sourcesTitle").textContent = `「${D().title}」的來源`;
+  $("deckSources").innerHTML = list.length ? list.map(s => `<li><b>${esc(s.name)}</b><span>${esc(s.license)}・${esc(s.basis)}</span>`
+    + (/^https:\/\//.test(s.url || "") ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a>` : "") + "</li>").join("")
+    : "<li>題卡檔還沒列出來源；每張卡翻面後的「出處」仍可查。</li>";
+}
+
 async function openDeck(id) {
   if (round) save();
   deckId = DECKS[id] ? id : "stats";
@@ -1032,7 +1096,8 @@ async function openDeck(id) {
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
     deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || [];
-  } catch (e) { deck = []; scopes = []; }
+    renderSources(doc.sources || []);
+  } catch (e) { deck = []; scopes = []; renderSources([]); }
   const u = ui();
   if (!scopes.some(s => s.id === u.scope)) u.scope = "all";
   const known = new Set(allCards().map(c => c.chapter));

@@ -18,7 +18,8 @@
     await new Promise(r => f.complete ? r() : f.addEventListener("load", r));
     await new Promise(r => setTimeout(r, 1500));  // cards.json arrives after load
     const W = f.contentWindow, D = f.contentDocument;
-    const decks = await Promise.all(["../cards.json", "../cards-research.json"].map(u => fetch(u).then(r => r.json())));
+    // Every deck the app lists (DECKS), so a new deck is checked without editing this page (2026-10-14)
+    const decks = await Promise.all(Object.values(W.eval("DECKS")).map(d => fetch("../" + d.file).then(r => r.json())));
     const cards = decks.flatMap(d => d.cards);
     const longest = {};
     for (const c of cards) {
@@ -192,8 +193,11 @@
     for (const g of ["量化", "質性", "通論", "工具"]) if (!row.includes(g)) failures.push(`group ${g} missing under 本學期: ${row}`);
     W.eval(`(document.querySelector('#scopes [data-f="g:質性"]') || { click() {} }).click()`);
     if (W.eval("ui().scope") !== "all" || !W.eval("allCards().filter(inSelection).length")) failures.push("picking 質性 under 本學期 left no cards");
-    for (const deckName of ["stats", "research"]) {
+    for (const deckName of Object.keys(W.eval("DECKS"))) {
       await W.eval(`openDeck(${JSON.stringify(deckName)})`);
+      // every deck names its sources in the menu (出處與著作權, 2026-10-14)
+      seen.push(`sources/${deckName} listed`);
+      if (!D.querySelectorAll("#deckSources li b").length) failures.push(`${deckName}: no sources listed under 出處與著作權`);
       for (const ex of W.eval("exams")) {
         seen.push(`exam/${deckName} ${ex.id} fills`);
         const b = W.Engine.buildExam(W.eval("allCards()"), ex);
