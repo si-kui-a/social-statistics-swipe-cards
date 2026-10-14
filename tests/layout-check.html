@@ -155,6 +155,33 @@
     W.eval("record(1)"); W.eval("renderScores()");
     seen.push("menu/scores");
     if (!D.querySelector("#scores table") || !/已作答 1\//.test(D.getElementById("scores").textContent)) failures.push("menu scores do not show this round");
+    // Anonymous sharing against a stub endpoint: asked once at a round's end, nothing queued before
+    // the answer, a joined attempt queued without time of day or text, undo takes it back, the round's
+    // end sends it and an accepted reply empties the queue.
+    W.eval(`localStorage.clear(); load(); SHARE_URL = "stub://share";
+      window.sent = []; window.realFetch = window.fetch; window.fetch = async (u, o) => { sent.push(JSON.parse(o.body)); return { json: async () => ({ ok: true }) }; };`);
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
+    W.eval("ans(true)");
+    seen.push("share/nothing queued before joining");
+    if (W.eval("shareQueue().length")) failures.push("an attempt was queued before the learner joined");
+    for (let i = 0; i < 40 && W.eval("current"); i++) W.eval("ans(true)");
+    seen.push("share/asked once at the round's end");
+    if (!/要匿名回傳作答嗎/.test(D.querySelector("#card").textContent)) failures.push("no sharing question at the round's end");
+    W.eval(`document.querySelector('#card [data-share="1"]').click()`);
+    if (/要匿名回傳作答嗎/.test(D.querySelector("#card").textContent) || !W.eval("share().on")) failures.push("joining did not take or the question stayed");
+    W.eval(`document.getElementById("again").click()`);
+    W.eval("record(1)");
+    seen.push("share/joined attempt queued without time or text");
+    const queued = W.eval("shareQueue()[0]");
+    if (!queued || !/^\d{4}-\d{2}-\d{2}$/.test(queued.day) || Object.keys(queued).length !== 11) failures.push(`queued row: ${JSON.stringify(queued)}`);
+    W.eval("undoLast()");
+    seen.push("share/undo takes the row back");
+    if (W.eval("shareQueue().length")) failures.push("undo left the shared row queued");
+    W.eval("record(0)");
+    await W.eval("flushShare()");
+    seen.push("share/sent and cleared");
+    if (W.eval("shareQueue().length") || !W.eval("sent.length")) failures.push("queued row was not sent and cleared");
+    W.eval(`SHARE_URL = ""; window.fetch = realFetch; localStorage.clear(); load();`);
     // Research deck: a scope must not hide the other groups (2026-10-14: 本學期 hid 質性 and 工具), and
     // every mock exam fills its sections from the deck as exported.
     await W.eval(`openDeck("research")`);

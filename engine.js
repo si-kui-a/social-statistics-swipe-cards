@@ -383,7 +383,23 @@
     return errs;
   }
 
-  const Engine = { EXPORT_VERSION, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
+  // Anonymous sharing (opt-in, asked once): one row per attempt with only what item statistics need.
+  // The day but not the time, the letter picked or the number typed but never written text, and first
+  // = the learner's first attempt at the card (item statistics count one first attempt per person and
+  // card: later ones are not independent and have seen the answer). The receiving Apps Script
+  // (apps-script/Code.gs) refuses any other field; engine.test.js checks both sides on the same rows.
+  function shareDay(t) {
+    const d = new Date(t);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function shareRow(deck, card, entry, first, id, install) {
+    const f = card.format === "mc" || card.format === "num" ? card.format : "";
+    return { id, install, deck, card: card.id, day: shareDay(entry[0]), right: entry[1], sure: entry[2],
+             score: entry.length > 3 ? entry[3] : entry[1], answer: f ? String(entry.length > 4 ? entry[4] : "").slice(0, ANSWER_MAX) : "",
+             first: first ? 1 : 0, level: level(card) };
+  }
+
+  const Engine = { EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
