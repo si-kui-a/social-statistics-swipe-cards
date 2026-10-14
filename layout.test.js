@@ -31,6 +31,19 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+// A syntax error in the check page or the app stops the page before it writes a result, and the run
+// only says "produced no result", which looks like a timeout (2026-10-14: a second `const row`).
+// Compile every inline script first so the error names itself.
+for (const page of ["tests/layout-check.html", "index.html"]) {
+  const html = fs.readFileSync(path.join(ROOT, page), "utf8");
+  for (const [, code] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    try { new Function(code); } catch (e) {  // compiles only; nothing runs
+      console.log(`FAIL ${page}: script does not compile: ${e.message}`);
+      process.exit(1);
+    }
+  }
+}
+
 server.listen(0, "127.0.0.1", () => {
   const url = `http://127.0.0.1:${server.address().port}/tests/layout-check.html`;
   const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--no-first-run",
