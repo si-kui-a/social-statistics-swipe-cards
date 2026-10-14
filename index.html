@@ -214,7 +214,7 @@ table.t td.n, table.t th.n { text-align: right; }
 
 <script src="engine.js"></script>
 <script>
-const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", exam: "國考選擇題", tool: "軟體操作", mine: "自製" };
+const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", open: "開放教材", exam: "國考選擇題", tool: "軟體操作", mine: "自製" };
 // Only what the buttons and labels do not already say; the line also carries "answer first" prompts.
 const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip: "" };
 // Each deck keeps its own cards, progress, ability estimates and exports, so the subjects never mix.
@@ -223,6 +223,7 @@ const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip
 const DECKS = {
   stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1", newStart: 15 },
   research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newStart: 20 },
+  theory: { title: "社會學理論", file: "cards-theory.json", key: "swipe-cards-theory-v1", newStart: 15 },
 };
 const DECK_KEY = "swipe-cards-deck";
 const KEEP_ROUNDS = 12, KEEP_HISTORY = 60;
