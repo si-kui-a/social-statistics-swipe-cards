@@ -127,5 +127,6 @@
 | `cards-theory.json` | 社會學理論題目，由課程倉庫的 `theory_cards.py export` 覆寫，不要手動編輯 |
 | `sw.js` | 離線快取 |
 | `apps-script/Code.gs` | 匿名回傳的接收端（貼到 Google Apps Script 部署；部署步驟寫在檔案開頭） |
+| `改善規劃.md` | 競品比較後的改善提案、多語化規劃與排序（尚未實作） |
 | `LICENSE` | CC BY-SA 4.0 全文（適用範圍見上方「授權」） |
 | `manifest.webmanifest`、圖示 | 加到主畫面用 |
