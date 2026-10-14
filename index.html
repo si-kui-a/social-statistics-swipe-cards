@@ -400,7 +400,9 @@ function renderChips() {
     ? [["s:all", "全部範圍", cards.length], ...scopes.map(s => [`s:${s.id}`, s.title, cards.filter(c => scopeHas(s, c)).length])]
     : [];
   const inS = cards.filter(inScope);
-  const groups = [...new Set([...inS].sort((a, b) => a.chapter < b.chapter ? -1 : 1).filter(c => c.group).map(c => c.group))];
+  // Every group of the deck, not only those in the scope: listing the scope's groups hid 質性 and 工具
+  // whenever 本學期 was picked (2026-10-14). A group with none in the scope shows 0; picking it widens the scope.
+  const groups = [...new Set([...cards].sort((a, b) => a.chapter < b.chapter ? -1 : 1).filter(c => c.group).map(c => c.group))];
   if (groups.length) outer.push(...(scopes.length ? [] : [["g:all", "全部大類", inS.length]]),
     ...groups.map(g => [`g:${g}`, g, inS.filter(c => c.group === g).length]));
   $("scopes").hidden = !outer.length;
@@ -798,7 +800,10 @@ $("mix").addEventListener("click", e => {
 $("scopes").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;
   const [kind, v] = [b.dataset.f.slice(0, 1), b.dataset.f.slice(2)];
-  changeSelection(u => { if (kind === "s") { u.scope = v; u.group = "all"; } else u.group = v; u.chapters = []; });
+  changeSelection(u => { if (kind === "s") { u.scope = v; u.group = "all"; } else {
+    u.group = v;
+    if (!allCards().some(c => c.group === v && inScope(c))) u.scope = "all";
+  } u.chapters = []; });
 });
 $("chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;

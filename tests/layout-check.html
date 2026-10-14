@@ -155,6 +155,24 @@
     W.eval("record(1)"); W.eval("renderScores()");
     seen.push("menu/scores");
     if (!D.querySelector("#scores table") || !/已作答 1\//.test(D.getElementById("scores").textContent)) failures.push("menu scores do not show this round");
+    // Research deck: a scope must not hide the other groups (2026-10-14: 本學期 hid 質性 and 工具), and
+    // every mock exam fills its sections from the deck as exported.
+    await W.eval(`openDeck("research")`);
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "sched"; u.scope = "sem1"; u.group = "all"; u.chapters = []; }`);
+    seen.push("groups/listed under a scope");
+    const row = D.getElementById("scopes").textContent;
+    for (const g of ["量化", "質性", "通論", "工具"]) if (!row.includes(g)) failures.push(`group ${g} missing under 本學期: ${row}`);
+    W.eval(`(document.querySelector('#scopes [data-f="g:質性"]') || { click() {} }).click()`);
+    if (W.eval("ui().scope") !== "all" || !W.eval("allCards().filter(inSelection).length")) failures.push("picking 質性 under 本學期 left no cards");
+    for (const deckName of ["stats", "research"]) {
+      await W.eval(`openDeck(${JSON.stringify(deckName)})`);
+      for (const ex of W.eval("exams")) {
+        seen.push(`exam/${deckName} ${ex.id} fills`);
+        const b = W.Engine.buildExam(W.eval("allCards()"), ex);
+        if (b.short.length) failures.push(`${deckName} ${ex.id}: sections short ${b.short.join("、")}`);
+      }
+    }
     W.localStorage.clear();
     out.textContent = JSON.stringify({ seen, failures });
   } catch (e) {
