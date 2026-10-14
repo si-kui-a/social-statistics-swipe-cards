@@ -343,6 +343,43 @@
     return out;
   }
 
+  // Exam progress (改善規劃.md, stage A): familiarity says "do I know it", risk says "will I make it".
+  // work = cards in the scope not yet mastered (box < 3) plus mastered ones falling due before the exam;
+  // capacity = days left x recent pace (distinct cards answered per day over the last 7 days). Risk tiers
+  // are fixed before seeing data (穩 < 0.7 <= 注意 <= 1 < 危險) and a sure-but-wrong share over 20% is at
+  // least 注意 (thinking you know is riskier than knowing you don't). No history: no pace, so no tier.
+  const RISK_CALM = 0.7, RISK_DANGER = 1, SURE_WRONG_ALERT = 0.2, PACE_DAYS = 7, PACE_MIN_ACTIVE = 3;
+  function examProgress(scopeCards, progress, examTime, now = Date.now()) {
+    const daysLeft = Math.max(0, Math.ceil((examTime - now) / DAY));
+    let notLearned = 0, dueBefore = 0, sure = 0, sureWrong = 0;
+    for (const c of scopeCards) {
+      const p = progress[c.id];
+      if (!p || p.box < 3) notLearned++;
+      else if (p.due <= examTime) dueBefore++;
+      for (const e of (p && p.log) || []) if (e[2]) { sure++; if (!e[1]) sureWrong++; }
+    }
+    const work = notLearned + dueBefore;
+    const since = now - PACE_DAYS * DAY, perDay = new Map();
+    for (const [id, p] of Object.entries(progress)) {
+      for (const e of p.log || []) {
+        if (e[0] < since || e[0] > now) continue;
+        const day = Math.floor(e[0] / DAY);
+        if (!perDay.has(day)) perDay.set(day, new Set());
+        perDay.get(day).add(id);
+      }
+    }
+    const answered = [...perDay.values()].reduce((n, s) => n + s.size, 0);
+    const hasHistory = Object.keys(progress).length > 0;
+    const pace = answered / PACE_DAYS;
+    const ratio = !hasHistory ? null : pace > 0 && daysLeft > 0 ? work / (daysLeft * pace) : work ? Infinity : 0;
+    let tier = ratio === null ? null : ratio < RISK_CALM ? "穩" : ratio <= RISK_DANGER ? "注意" : "危險";
+    const sureWrongShare = sure ? sureWrong / sure : 0;
+    if (tier === "穩" && sureWrongShare > SURE_WRONG_ALERT) tier = "注意";
+    return { daysLeft, notLearned, dueBefore, work, pace: Math.round(pace * 10) / 10, activeDays: perDay.size,
+      unstable: hasHistory && perDay.size < PACE_MIN_ACTIVE, ratio, tier, sureWrongShare,
+      perDay: daysLeft > 0 ? Math.ceil(work / daysLeft) : work };
+  }
+
   // Exports carry schemaVersion. 1 (or none): [time, correct, sure] attempts only; 2 adds an essay score
   // as a fourth attempt field, the ability model, settings and essay text; 3 adds a fifth field, the
   // answer given (the letter picked, or the number typed), so a wrong answer can be traced to the
@@ -399,7 +436,7 @@
              first: first ? 1 : 0, level: level(card) };
   }
 
-  const Engine = { EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
+  const Engine = { examProgress, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
