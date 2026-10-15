@@ -215,10 +215,13 @@
           W.eval(`localStorage.clear(); load(); state.progress = ${JSON.stringify(s.progress)}; state.history = ${JSON.stringify(s.history)};
             importedNote = ${s.imported}; queue = []; current = null;
             round = { label: "x", pace: "sched", total: 2, results: ${JSON.stringify(ids.map(id => ({ id, label: "x", right: false, sure: 0 })))}, retried: [], ids: [] }; render();`);
-          // measure the settled layout: on CI the first deck was measured mid entrance animation, its text
-          // fragments drifting upward, so a two-line summary counted as three or four lines (2026-10-15)
+          // Measure the settled layout. render() clears the swipe transform with a CSS transition, so on CI
+          // the first deck was measured while the card was still rotating back from the earlier swipe
+          // check: fragments shrank and drifted upward and a two-line summary counted as four (2026-10-15).
+          // getAnimations() did not see a transition that had not started yet, so switch it off instead.
+          W.eval("clearTimeout(advanceTimer)");
+          const card = D.getElementById("card"); card.style.transition = "none"; void card.offsetWidth;
           await D.fonts.ready;
-          await Promise.all(D.getAnimations().map(a => a.finished.catch(() => {})));
           const box = D.querySelector(".progress-box"), text = box ? box.textContent : "";
           for (const w of s.want) if (!text.includes(w)) failures.push(`${deckName} ${name}: progress box lacks "${w}": ${text.slice(0, 160)}`);
           const img = box && box.querySelector(".voice img");
