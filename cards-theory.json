@@ -9345,7 +9345,14 @@
    "注意": "知識要靠持續的觀察累積。把複習排進固定的時間，秩序才帶來進步。",
    "危險": "沒有秩序就沒有進步。今天先完成建議的張數，讓學習回到規律。",
    "none": "實證從觀察開始：先作答幾輪，我們才有資料可以判斷。",
-   "sure": "確信不等於證明。把你以為懂的，拿去和事實比對一次。"
+   "sure": "確信不等於證明。把你以為懂的，拿去和事實比對一次。",
+   "img": "img/comte.webp",
+   "quote": {
+    "text": "science, d'où prévoyance; prévoyance, d'où action",
+    "zh": "科學，故能預見；預見，故能行動。",
+    "src": "《實證哲學教程》第一卷第二講，1830"
+   },
+   "streak": "連續三輪都在危險區：秩序比衝刺重要。先把範圍縮到一兩章，建立做得完的規律，再求進步。"
   },
   "馬克思": {
    "name": "馬克思",
@@ -9353,7 +9360,14 @@
    "注意": "條件正在改變，還來得及：把時間投在最常錯的那幾章，而不是平均分配。",
    "危險": "照現在的速度，考前做不完。改變條件，而不是只靠意志：今天先做完建議的張數。",
    "none": "先做幾輪，物質條件——你的作答紀錄——才看得清楚。",
-   "sure": "你對自己理解的信心，恐怕是一種虛假意識。回到條件本身，再想一次。"
+   "sure": "你對自己理解的信心，恐怕是一種虛假意識。回到條件本身，再想一次。",
+   "img": "img/marx.webp",
+   "quote": {
+    "text": "Die Philosophen haben die Welt nur verschieden interpretiert; es kommt aber darauf an, sie zu verändern.",
+    "zh": "哲學家們只是用不同的方式解釋世界，問題在於改變世界。",
+    "src": "〈關於費爾巴哈的提綱〉第十一條，恩格斯 1888 年刊本"
+   },
+   "streak": "連續三輪都做不完，問題在條件，不在意志。改變條件：縮小範圍，把每日上限調到做得到的量。"
   },
   "涂爾幹": {
    "name": "涂爾幹",
@@ -9361,7 +9375,14 @@
    "注意": "規範開始鬆動。每天固定的量，就是讓學習不致脫序的紀律。",
    "危險": "你的學習正處於脫序：目標還在，規範不見了。每天固定的量，就是你的紀律。",
    "none": "社會事實要從資料看：先作答幾輪，再來判斷你的狀態。",
-   "sure": "個人的確信不能代替事實。把答錯的當作社會事實來檢視，找出它的原因。"
+   "sure": "個人的確信不能代替事實。把答錯的當作社會事實來檢視，找出它的原因。",
+   "img": "img/durkheim.webp",
+   "quote": {
+    "text": "La première règle et la plus fondamentale est de considérer les faits sociaux comme des choses.",
+    "zh": "第一條、也是最根本的規則，是把社會事實當作事物來看待。",
+    "src": "《社會學方法的規則》第二章，Alcan 1919 年版"
+   },
+   "streak": "連續三輪的危險，說明規範定得太高而失去作用。把每天的量調到做得到，紀律才能重新建立。"
   },
   "韋伯": {
    "name": "韋伯",
@@ -9369,7 +9390,14 @@
    "注意": "先把容易混淆的概念各自建立理念型，再拿題目去比，界線就清楚了。",
    "危險": "時間有限，就要計算：先做最可能拿分的章節，把每天的量當作天職來完成。",
    "none": "理解要從行動開始：先作答，再詮釋你的錯誤。",
-   "sure": "以為理解了，其實只是直接理解；試著說出概念背後的動機與脈絡。"
+   "sure": "以為理解了，其實只是直接理解；試著說出概念背後的動機與脈絡。",
+   "img": "img/weber.webp",
+   "quote": {
+    "text": "Die Politik bedeutet ein starkes langsames Bohren von harten Brettern mit Leidenschaft und Augenmaß zugleich.",
+    "zh": "政治是同時帶著熱情與判斷力，緩慢而有力地鑽透硬木板。",
+    "src": "《以政治為志業》，1919"
+   },
+   "streak": "連續三輪都超出負荷：目的與手段要重新計算。先只做最可能拿分的一兩章，其他的之後再排。"
   }
  },
  "sources": [
@@ -9393,6 +9421,54 @@
    "name": "國考題的解說、申論評分要點與參考答案",
    "basis": "AI 依教科書通說撰寫，非官方",
    "license": "CC BY-SA 4.0"
+  },
+  {
+   "name": "肖像：孔德（Johan Hendrik Hoffmeister 據 1849～1851 年銀版照片）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Auguste_Comte.jpg"
+  },
+  {
+   "name": "肖像：馬克思（John Jabez Edwin Mayall 攝，1875 年以前）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Karl_Marx_001.jpg"
+  },
+  {
+   "name": "肖像：涂爾幹（攝影者不詳，1918 年以前）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Emile_Durkheim.jpg"
+  },
+  {
+   "name": "肖像：韋伯（攝影者不詳，1894）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Max_Weber_1894.jpg"
+  },
+  {
+   "name": "名言：孔德《實證哲學教程》第一卷第二講",
+   "basis": "逐字核對 Project Gutenberg 公有領域原文；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://www.gutenberg.org/ebooks/31881"
+  },
+  {
+   "name": "名言：馬克思〈關於費爾巴哈的提綱〉第十一條（恩格斯 1888 年刊本）",
+   "basis": "逐字核對 marxists.org 德文原文；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://www.marxists.org/deutsch/archiv/marx-engels/1845/thesen/thesfeue.htm"
+  },
+  {
+   "name": "名言：涂爾幹《社會學方法的規則》第二章",
+   "basis": "逐字核對法文維基文庫公有領域原文；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://fr.wikisource.org/wiki/Les_R%C3%A8gles_de_la_m%C3%A9thode_sociologique/Chapitre_2"
+  },
+  {
+   "name": "名言：韋伯《以政治為志業》",
+   "basis": "逐字核對德文維基文庫公有領域原文；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://de.wikisource.org/wiki/Politik_als_Beruf"
   }
  ]
 }

@@ -198,6 +198,52 @@
       // every deck names its sources in the menu (出處與著作權, 2026-10-14)
       seen.push(`sources/${deckName} listed`);
       if (!D.querySelectorAll("#deckSources li b").length) failures.push(`${deckName}: no sources listed under 出處與著作權`);
+      // exam progress in its three data states (改善規劃.md stage A acceptance): no records, cached records
+      // with three 危險 rounds in a row, and records imported from a file with nothing in the last 7 days.
+      if (Object.keys(W.eval("voices")).length && W.eval("!!progressScope()")) {
+        const ids = W.eval("allCards().filter(c => scopeHas(progressScope(), c)).slice(0, 2).map(c => c.id)"), now = Date.now();
+        const states = {
+          none: { progress: {}, history: [], imported: false, want: ["暫不判斷危機度", "虛構評語"] },
+          cached: { progress: { [ids[0]]: { box: 1, due: now, log: [[now, 0, 0]] } },
+            history: [1, 2, 3].map(i => ({ t: now - i, label: "x", n: 1, right: 0, sureWrong: 0, tier: "危險" })), imported: false,
+            want: ["危機：危險", "連續 3 輪", "虛構評語"] },
+          imported: { progress: { [ids[0]]: { box: 1, due: now, log: [[now - 30 * 864e5, 1, 0]] } }, history: [], imported: true,
+            want: ["全部紀錄的平均速度", "依匯入的成績計算"] },
+        };
+        for (const [name, s] of Object.entries(states)) {
+          seen.push(`progress/${deckName} ${name}`);
+          W.eval(`localStorage.clear(); load(); state.progress = ${JSON.stringify(s.progress)}; state.history = ${JSON.stringify(s.history)};
+            importedNote = ${s.imported}; queue = []; current = null;
+            round = { label: "x", pace: "sched", total: 2, results: ${JSON.stringify(ids.map(id => ({ id, label: "x", right: false, sure: 0 })))}, retried: [], ids: [] }; render();`);
+          // Measure the settled layout. render() clears the swipe transform with a CSS transition, so on CI
+          // the first deck was measured while the card was still rotating back from the earlier swipe
+          // check: fragments shrank and drifted upward and a two-line summary counted as four (2026-10-15).
+          // getAnimations() did not see a transition that had not started yet, so switch it off instead.
+          W.eval("clearTimeout(advanceTimer)");
+          const card = D.getElementById("card"); card.style.transition = "none"; void card.offsetWidth;
+          await D.fonts.ready;
+          const box = D.querySelector(".progress-box"), text = box ? box.textContent : "";
+          for (const w of s.want) if (!text.includes(w)) failures.push(`${deckName} ${name}: progress box lacks "${w}": ${text.slice(0, 160)}`);
+          const img = box && box.querySelector(".voice img");
+          if (!img) { failures.push(`${deckName} ${name}: no portrait`); continue; }
+          await new Promise(r => img.complete ? r() : (img.onload = img.onerror = r));
+          if (!img.naturalWidth) failures.push(`${deckName} ${name}: portrait ${img.getAttribute("src")} did not load`);
+          if (!box.querySelector(".voice .quote")) failures.push(`${deckName} ${name}: no sourced quote`);
+          // Count the lines the text actually breaks into (the text fragments' vertical positions), not
+          // height / line height: on CI a fallback font made a two-line box 3.5 "lines" tall (2026-10-15).
+          const line = box.querySelector(".prog-line"), range = D.createRange();
+          range.selectNodeContents(line);
+          const mids = [...range.getClientRects()].filter(x => x.width > 0).map(x => (x.top + x.bottom) / 2).sort((a, b) => a - b);
+          const lines = [];
+          for (const m of mids) {
+            const last = lines[lines.length - 1];
+            if (last && m - last.mid < 8) last.n++; else lines.push({ mid: m, n: 1 });
+          }
+          const cs = W.getComputedStyle(line), info = `${lines.length} lines, ${Math.round(line.getBoundingClientRect().width)}px wide, font ${cs.fontSize} ${cs.fontFamily}, word-break ${cs.wordBreak}, lang ${line.closest("[lang]") ? line.closest("[lang]").lang : "-"}, fragments ${[...range.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top) + ":" + Math.round(x.width)).join(" ")}`;
+          if (lines.length > 2) failures.push(`${deckName} ${name}: summary line breaks into ${info}: ${line.textContent}`);
+          if (box.getBoundingClientRect().right > W.innerWidth + 0.5) failures.push(`${deckName} ${name}: progress box wider than the screen`);
+        }
+      }
       for (const ex of W.eval("exams")) {
         seen.push(`exam/${deckName} ${ex.id} fills`);
         const b = W.Engine.buildExam(W.eval("allCards()"), ex);

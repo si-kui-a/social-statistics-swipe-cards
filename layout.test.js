@@ -10,7 +10,7 @@ const { execFile } = require("child_process");
 
 const ROOT = __dirname;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".css": "text/css",
-                ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+                ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".webmanifest": "application/manifest+json" };
 const CHROME = process.env.CHROME || [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

@@ -1,8 +1,10 @@
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
-const CACHE = "swipe-cards-v11";
+const CACHE = "swipe-cards-v12";
+// scholar portraits shown with the exam progress (engine.test.js checks this list against img/)
+const PORTRAITS = ["comte", "marx", "durkheim", "weber", "nightingale", "gosset"].map(n => `img/${n}.webp`);
 const FILES = ["./", "index.html", "engine.js", "cards.json", "cards-research.json", "cards-theory.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
-               "icon-512.png", "apple-touch-icon.png"];
+               "icon-512.png", "apple-touch-icon.png", ...PORTRAITS];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
