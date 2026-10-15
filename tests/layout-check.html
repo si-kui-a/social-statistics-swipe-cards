@@ -18,6 +18,10 @@
     await new Promise(r => f.complete ? r() : f.addEventListener("load", r));
     await new Promise(r => setTimeout(r, 1500));  // cards.json arrives after load
     const W = f.contentWindow, D = f.contentDocument;
+    // Measure settled layouts only: freeze CSS transitions and animations for every check. 2026-10-15:
+    // the card was still rotating back from a swipe check when the progress box was measured on CI, and
+    // a two-line summary counted as four lines (phone_shot.js freezes motion the same way by default).
+    D.head.insertAdjacentHTML("beforeend", "<style>*,*::before,*::after{transition:none!important;animation:none!important}</style>");
     // Every deck the app lists (DECKS), so a new deck is checked without editing this page (2026-10-14)
     const decks = await Promise.all(Object.values(W.eval("DECKS")).map(d => fetch("../" + d.file).then(r => r.json())));
     const cards = decks.flatMap(d => d.cards);
@@ -215,12 +219,7 @@
           W.eval(`localStorage.clear(); load(); state.progress = ${JSON.stringify(s.progress)}; state.history = ${JSON.stringify(s.history)};
             importedNote = ${s.imported}; queue = []; current = null;
             round = { label: "x", pace: "sched", total: 2, results: ${JSON.stringify(ids.map(id => ({ id, label: "x", right: false, sure: 0 })))}, retried: [], ids: [] }; render();`);
-          // Measure the settled layout. render() clears the swipe transform with a CSS transition, so on CI
-          // the first deck was measured while the card was still rotating back from the earlier swipe
-          // check: fragments shrank and drifted upward and a two-line summary counted as four (2026-10-15).
-          // getAnimations() did not see a transition that had not started yet, so switch it off instead.
-          W.eval("clearTimeout(advanceTimer)");
-          const card = D.getElementById("card"); card.style.transition = "none"; void card.offsetWidth;
+          W.eval("clearTimeout(advanceTimer)");  // a pending swipe advance would replace this screen
           await D.fonts.ready;
           const box = D.querySelector(".progress-box"), text = box ? box.textContent : "";
           for (const w of s.want) if (!text.includes(w)) failures.push(`${deckName} ${name}: progress box lacks "${w}": ${text.slice(0, 160)}`);
