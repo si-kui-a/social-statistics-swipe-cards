@@ -223,11 +223,17 @@
           await new Promise(r => img.complete ? r() : (img.onload = img.onerror = r));
           if (!img.naturalWidth) failures.push(`${deckName} ${name}: portrait ${img.getAttribute("src")} did not load`);
           if (!box.querySelector(".voice .quote")) failures.push(`${deckName} ${name}: no sourced quote`);
-          // one line of the same style as the yardstick: "normal" line height differs between fonts (CI vs local)
-          const line = box.querySelector(".prog-line"), probe = line.cloneNode(false);
-          probe.textContent = "測"; probe.style.cssText = "position:absolute;visibility:hidden;width:auto;white-space:nowrap";
-          line.parentNode.appendChild(probe); const lh = probe.getBoundingClientRect().height; probe.remove();
-          if (line.getBoundingClientRect().height > 2.5 * lh) failures.push(`${deckName} ${name}: summary line wraps past two lines (${Math.round(line.getBoundingClientRect().height)}px, one line ${Math.round(lh)}px, ${Math.round(line.getBoundingClientRect().width)}px wide): ${line.textContent}`);
+          // Count the lines the text actually breaks into (the text fragments' vertical positions), not
+          // height / line height: on CI a fallback font made a two-line box 3.5 "lines" tall (2026-10-15).
+          const line = box.querySelector(".prog-line"), range = D.createRange();
+          range.selectNodeContents(line);
+          const mids = [...range.getClientRects()].filter(x => x.width > 0).map(x => (x.top + x.bottom) / 2).sort((a, b) => a - b);
+          const lines = [];
+          for (const m of mids) {
+            const last = lines[lines.length - 1];
+            if (last && m - last.mid < 8) last.n++; else lines.push({ mid: m, n: 1 });
+          }
+          if (lines.length > 2) failures.push(`${deckName} ${name}: summary line breaks into ${lines.length} lines: ${line.textContent}`);
           if (box.getBoundingClientRect().right > W.innerWidth + 0.5) failures.push(`${deckName} ${name}: progress box wider than the screen`);
         }
       }
