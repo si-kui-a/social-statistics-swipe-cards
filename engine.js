@@ -370,14 +370,40 @@
     }
     const answered = [...perDay.values()].reduce((n, s) => n + s.size, 0);
     const hasHistory = Object.keys(progress).length > 0;
-    const pace = answered / PACE_DAYS;
+    let pace = answered / PACE_DAYS, paceFrom = "recent";
+    if (!answered && hasHistory) {
+      // Imported or long-idle records with nothing in the last 7 days: the whole-history average
+      // (distinct cards per day over the span answered) instead of a pace of 0, flagged as such.
+      const days = new Map();
+      for (const [id, p] of Object.entries(progress)) {
+        for (const e of p.log || []) {
+          if (e[0] > now) continue;
+          const day = Math.floor(e[0] / DAY);
+          if (!days.has(day)) days.set(day, new Set());
+          days.get(day).add(id);
+        }
+      }
+      if (days.size) {
+        const span = Math.max(...days.keys()) - Math.min(...days.keys()) + 1;
+        pace = [...days.values()].reduce((n, s) => n + s.size, 0) / span;
+        paceFrom = "all";
+      }
+    }
     const ratio = !hasHistory ? null : pace > 0 && daysLeft > 0 ? work / (daysLeft * pace) : work ? Infinity : 0;
     let tier = ratio === null ? null : ratio < RISK_CALM ? "穩" : ratio <= RISK_DANGER ? "注意" : "危險";
     const sureWrongShare = sure ? sureWrong / sure : 0;
     if (tier === "穩" && sureWrongShare > SURE_WRONG_ALERT) tier = "注意";
     return { daysLeft, notLearned, dueBefore, work, pace: Math.round(pace * 10) / 10, activeDays: perDay.size,
-      unstable: hasHistory && perDay.size < PACE_MIN_ACTIVE, ratio, tier, sureWrongShare,
+      unstable: hasHistory && perDay.size < PACE_MIN_ACTIVE, paceFrom, ratio, tier, sureWrongShare,
       perDay: daysLeft > 0 ? Math.ceil(work / daysLeft) : work };
+  }
+
+  // Three rounds in a row at 危險 (exam rounds aside): repeating the warning stops helping, so the advice
+  // turns to a smaller daily scope (改善規劃.md, learning-expert note). A round without a tier breaks it.
+  const DANGER_STREAK = 3;
+  function dangerStreak(history, n = DANGER_STREAK) {
+    const h = (history || []).filter(x => x && !x.exam).slice(-n);
+    return h.length === n && h.every(x => x.tier === "危險");
   }
 
   // Exports carry schemaVersion. 1 (or none): [time, correct, sure] attempts only; 2 adds an essay score
@@ -436,7 +462,7 @@
              first: first ? 1 : 0, level: level(card) };
   }
 
-  const Engine = { examProgress, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
+  const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
                    matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

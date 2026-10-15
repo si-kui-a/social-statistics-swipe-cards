@@ -218,12 +218,45 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   const late = E.examProgress(cards, { a: { box: 1, due: now, log: log(1) } }, now + D1, now);
   ok("progress: more work than capacity is 危險", late.tier === "危險" && late.perDay === 4 && late.unstable);
   ok("progress: exam passed gives 0 days", E.examProgress(cards, calm, now - D1, now).daysLeft === 0);
+  // imported records older than 7 days: 6 distinct card-days over a 3-day span -> pace 2, not 0
+  const old = { a: { box: 1, due: now, log: [[now - 30 * D1, 1, 0]] }, b: { box: 1, due: now, log: [[now - 30 * D1, 1, 0], [now - 28 * D1, 1, 0]] },
+    c: { box: 1, due: now, log: [[now - 28 * D1, 0, 0]] }, d: { box: 1, due: now, log: [[now - 29 * D1, 1, 0], [now - 28 * D1, 1, 0]] } };
+  const imp = E.examProgress(cards, old, exam, now);
+  ok("progress: no recent attempts uses the whole-history pace", imp.paceFrom === "all" && imp.pace === 2 && imp.tier === "穩");
+  ok("progress: recent attempts keep the 7-day pace", p.paceFrom === "recent");
+}
+
+// three 危險 rounds in a row (exam rounds skipped, a round without a tier breaks the streak)
+{
+  const r = tier => ({ t: 1, tier }), x = { t: 1, exam: true };
+  ok("streak: three 危險 rounds, an exam round between", E.dangerStreak([r("穩"), r("危險"), r("危險"), x, r("危險")]));
+  ok("streak: two are not enough", !E.dangerStreak([r("危險"), r("危險")]));
+  ok("streak: a calmer round breaks it", !E.dangerStreak([r("危險"), r("注意"), r("危險"), r("危險")]));
+  ok("streak: old rounds without a tier do not count", !E.dangerStreak([{ t: 1 }, r("危險"), r("危險")]));
 }
 
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
 ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw));
+
+// portraits: every file in img/ is cached offline, each at most 30 KB (改善規劃.md cost check), and every
+// voice in a deck points at one of them, carries a sourced quote and a text for a 危險 streak
+{
+  const fs = require("fs"), path = require("path");
+  const listed = [...sw.match(/const PORTRAITS = \[([^\]]*)\]/)[1].matchAll(/"([\w-]+)"/g)].map(m => `img/${m[1]}.webp`).sort();
+  const files = fs.readdirSync(path.join(__dirname, "img")).map(f => `img/${f}`).sort();
+  ok("portraits: sw.js list matches img/", JSON.stringify(listed) === JSON.stringify(files));
+  ok("portraits: each at most 30 KB", files.every(f => fs.statSync(path.join(__dirname, f)).size <= 30 * 1024));
+  for (const deck of ["cards.json", "cards-theory.json"]) {
+    const doc = JSON.parse(fs.readFileSync(path.join(__dirname, deck), "utf8")), vs = Object.values(doc.voices || {});
+    ok(`voices: ${deck} has voices`, vs.length > 0);
+    ok(`voices: ${deck} portraits exist`, vs.every(v => files.includes(v.img)));
+    ok(`voices: ${deck} quotes carry text, translation and source`, vs.every(v => v.quote && v.quote.text && v.quote.zh && v.quote.src));
+    ok(`voices: ${deck} streak advice present`, vs.every(v => v.streak));
+    ok(`voices: ${deck} portraits listed in sources`, vs.every(v => (doc.sources || []).some(s => (s.name || "").includes(v.name) && /^https:\/\/commons\.wikimedia\.org\//.test(s.url || ""))));
+  }
+}
 
 console.log(`${fails} failed`);
 process.exit(fails ? 1 : 0);

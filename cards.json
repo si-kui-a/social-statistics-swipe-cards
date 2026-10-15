@@ -6677,6 +6677,76 @@
    "name": "國考題的解說與申論評分要點",
    "basis": "AI 依教科書通說撰寫，非官方",
    "license": "CC BY-SA 4.0"
+  },
+  {
+   "name": "肖像：南丁格爾（約 1860）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Florence_Nightingale_three_quarter_length.jpg"
+  },
+  {
+   "name": "肖像：Gosset（Student）（1908 年攝，取自 1939 年 Annals of Eugenics 訃聞，攝影者不詳）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:William_Sealy_Gosset.jpg"
+  },
+  {
+   "name": "名言：南丁格爾《Notes on Hospitals》第三版序",
+   "basis": "逐字核對 Internet Archive 的 1863 年版掃描；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://archive.org/details/b21297721"
+  },
+  {
+   "name": "名言：Gosset（Student）〈The Probable Error of a Mean〉導論",
+   "basis": "逐字核對 1908 年 Biometrika 原刊掃描；中譯為作者自譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://doi.org/10.2307/2331554"
   }
- ]
+ ],
+ "voices": {
+  "nightingale": {
+   "name": "南丁格爾",
+   "chapters": [
+    "B1",
+    "D1",
+    "D2",
+    "D3"
+   ],
+   "img": "img/nightingale.webp",
+   "穩": "你的數字說明了進度穩定。像我把死亡率畫成圖一樣，持續記錄，問題一出現就看得見。",
+   "注意": "把錯誤當成資料來看：哪一章錯得最多，就先從那裡改善。",
+   "危險": "照現在的數字，考前做不完。先處理錯最多的章節，今天完成建議的張數。",
+   "none": "沒有資料就無從改善：先作答幾輪，讓數字告訴我們情況。",
+   "sure": "確信不能代替統計。把有把握卻答錯的題目記下來，看它們有什麼共同點。",
+   "streak": "連續三輪都在危險區：先別讓學習傷害自己。把範圍縮小、每天做得完，數字才會好轉。",
+   "quote": {
+    "text": "It may seem a strange principle to enunciate as the very first requirement in a Hospital that it should do the sick no harm.",
+    "zh": "把「不傷害病人」說成醫院的第一要求，也許顯得奇怪。",
+    "src": "《Notes on Hospitals》第三版序，1863"
+   }
+  },
+  "gosset": {
+   "name": "Gosset（Student）",
+   "chapters": [
+    "I1",
+    "I2",
+    "I3",
+    "I4",
+    "I5",
+    "I6"
+   ],
+   "img": "img/gosset.webp",
+   "穩": "你的結果穩定。不過別忘了：每一輪都只是母體中的一個樣本。",
+   "注意": "差異也許只是抽樣誤差，也許不是。多做幾輪，再判斷哪一章真的弱。",
+   "危險": "樣本告訴我們：照目前的速度考前做不完。今天先完成建議的張數。",
+   "none": "還沒有樣本，無從估計。先作答幾輪，我們再來算。",
+   "sure": "有把握卻答錯，代表你的估計有偏誤。回頭看公式的前提條件，再算一次。",
+   "streak": "三輪都是危險，樣本已經足以說明：目前的計畫做不完。縮小範圍或調低每日上限，再觀察幾輪。",
+   "quote": {
+    "text": "Any experiment may be regarded as forming an individual of a \"population\" of experiments which might be performed under the same conditions.",
+    "zh": "任何一次實驗，都可以看作在相同條件下可能進行的所有實驗所組成的「母體」中的一個個體。",
+    "src": "〈The Probable Error of a Mean〉，Biometrika 第 6 卷第 1 期，1908"
+   }
+  }
+ }
 }

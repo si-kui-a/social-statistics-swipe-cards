@@ -81,6 +81,10 @@ pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono
 .t-穩 { color: var(--right); } .t-注意 { color: var(--accent); } .t-危險 { color: var(--wrong); }
 .voice { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--line); font-size: .88rem; }
 .voice cite { display: block; font-style: normal; font-size: .75rem; color: var(--muted); }
+.voice::after { content: ""; display: block; clear: both; }
+.voice img { float: left; width: 48px; height: 60px; object-fit: cover; margin: 2px 8px 2px 0; border-radius: 4px; }
+.voice .quote { display: block; margin-top: 4px; font-size: .78rem; color: var(--muted); }
+.voice .quote i { display: block; }
 .report { font-size: .78rem; color: var(--muted); align-self: flex-end; }
 .a .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
 .hint { font-size: .85rem; color: var(--muted); margin: auto 0 0; }
@@ -305,6 +309,7 @@ let misconceptions = {};
 let exams = [], examTicker = null;
 // Fictional comments in a theorist's voice per group (deck file "voices"), shown with the exam progress.
 let voices = {};
+let importedNote = false;  // the first progress box after an import says it was computed from the imported file
 // phase: front (answering), back (flip card shown, grade yourself), rubric (tick essay points), result
 let phase = "front", sure = 0, picked = null, typed = "", ticks = [], lastScore = 0;
 // One step back for a mis-tap (2026-10-13: 答錯 pressed when the answer was right was saved for good)
@@ -618,27 +623,47 @@ function progressScope() {
   const today = dayStart(), dated = scopes.filter(s => s.date && new Date(`${s.date}T23:59:59`).getTime() >= today);
   return dated.find(s => s.id === ui().scope) || dated.sort((a, b) => a.date < b.date ? -1 : 1)[0];
 }
+// A card's voice: its group's (theory deck), else the voice whose chapter list holds its chapter (stats deck).
+function voiceKey(c) {
+  if (!c) return null;
+  if (c.group && voices[c.group]) return c.group;
+  return Object.keys(voices).find(k => (voices[k].chapters || []).includes(c.chapter)) || null;
+}
 function voiceFor(r, scopeCards) {
-  const count = new Map();
-  for (const x of r.results) if (!x.right) { const g = (byId(x.id) || {}).group; if (g) count.set(g, (count.get(g) || 0) + 1); }
-  if (!count.size) for (const c of scopeCards) if (c.group) count.set(c.group, (count.get(c.group) || 0) + 0.001);
-  const group = [...count.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).find(g => voices[g]);
-  return group ? voices[group] : null;
+  const count = new Map(), add = (k, w) => { if (k) count.set(k, (count.get(k) || 0) + w); };
+  for (const x of r.results) if (!x.right) add(voiceKey(byId(x.id)), 1);
+  if (!count.size) for (const c of scopeCards) add(voiceKey(c), 0.001);
+  const key = [...count.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])[0];
+  return key ? voices[key] : null;
+}
+function examStatus() {
+  const s = progressScope();
+  if (!s) return null;
+  const inS = allCards().filter(c => scopeHas(s, c));
+  return { s, inS, p: Engine.examProgress(inS, state.progress, new Date(`${s.date}T23:59:59`).getTime()) };
+}
+function voiceHtml(v, say) {
+  const img = /^img\/[\w-]+\.webp$/.test(v.img || "") ? `<img src="${esc(v.img)}" alt="${esc(v.name)}的肖像（公有領域）" width="48" height="60" loading="lazy">` : "";
+  const q = v.quote ? `<span class="quote">${esc(v.name)}：「${esc(v.quote.zh)}」<i>${esc(v.quote.text)}（${esc(v.quote.src)}）</i></span>` : "";
+  return `<blockquote class="voice">${img}「${esc(say)}」<cite>虛構評語：以${esc(v.name)}口吻撰寫，非本人言論</cite>${q}</blockquote>`;
 }
 function progressHtml(r) {
-  const s = progressScope();
-  if (!s) return "";
-  const inS = allCards().filter(c => scopeHas(s, c));
-  const p = Engine.examProgress(inS, state.progress, new Date(`${s.date}T23:59:59`).getTime());
+  const st = examStatus();
+  if (!st) return "";
+  const { s, inS, p } = st;
   const sureWrong = Engine.summarize(r.results).sureWrong.length;
-  const v = voiceFor(r, inS);
-  const say = v && (sureWrong >= 2 && v.sure ? v.sure : v[p.tier || "none"]);
-  const next = p.tier === "危險" ? `<p class="small">照目前的速度考前做不完：今天先做 ${p.perDay} 張，或把每日上限（☰ → 每日上限）調到 ${p.perDay} 張以上；也可以先縮小到最常錯的章節。</p>` : "";
+  const v = voiceFor(r, inS), streak = p.tier === "危險" && Engine.dangerStreak(state.history);
+  const say = v && (streak && v.streak ? v.streak : sureWrong >= 2 && v.sure ? v.sure : v[p.tier || "none"]);
+  const next = streak ? `<p class="small">已經連續 ${Engine.DANGER_STREAK} 輪都是「危險」：再多警告也沒用，換個做法。先把範圍縮小到最常錯的一兩章，或把每日上限（☰ → 每日上限）調成自己做得到的量，穩定做完再擴大。</p>`
+    : p.tier === "危險" ? `<p class="small">照目前的速度考前做不完：今天先做 ${p.perDay} 張，或把每日上限（☰ → 每日上限）調到 ${p.perDay} 張以上；也可以先縮小到最常錯的章節。</p>` : "";
+  const note = importedNote ? `<p class="small">依匯入的成績計算。</p>` : "";
+  importedNote = false;
   return `<div class="progress-box"><div class="meta"><span>考試進度</span><span>${esc(s.title)}</span></div>
     <p class="prog-line"><b>還有 ${p.daysLeft} 天</b>｜未熟悉或考前到期 ${p.work} 張｜${p.tier
-      ? `<span class="tier t-${p.tier}">危機：${p.tier}</span>` : "還沒有作答紀錄，暫不判斷危機度"}｜今天建議 ${p.perDay} 張${p.tier ? `（近 7 天每天約 ${p.pace} 張）` : ""}</p>
-    ${p.unstable ? `<p class="small">近 7 天只有 ${p.activeDays} 天有作答，速度估計不穩。</p>` : ""}${next}
-    ${say ? `<blockquote class="voice">「${esc(say)}」<cite>虛構評語：以${esc(v.name)}口吻撰寫，非本人言論</cite></blockquote>` : ""}</div>`;
+      ? `<span class="tier t-${p.tier}">危機：${p.tier}</span>` : "暫不判斷危機度"}｜今天建議 ${p.perDay} 張</p>
+    ${p.paceFrom === "all" ? `<p class="small">近 7 天沒有作答，改用全部紀錄的平均速度（每天約 ${p.pace} 張）估計，僅供參考。</p>`
+      : p.tier ? `<p class="small">近 7 天每天約 ${p.pace} 張${p.unstable ? `；只有 ${p.activeDays} 天有作答，速度估計不穩` : ""}。</p>` : ""}${note}${next}
+    ${say ? voiceHtml(v, say) : ""}</div>`;
 }
 
 function summaryHtml(r) {
@@ -752,8 +777,11 @@ function finishRound() {
   const s = Engine.summarize(round.results);
   round.ended = Date.now();
   clearInterval(examTicker);
+  // tier: the exam-progress risk at the end of this round, kept so three 危險 rounds in a row can be told
+  // apart from one (user decision 2026-10-15: the one field the progress feature adds to stored data).
+  const st = examStatus(), tier = st && st.p.tier;
   state.history = [...state.history, { t: Date.now(), label: round.label, pace: round.pace, retry: round.retry, exam: !!round.exam, n: s.n, right: s.right,
-                                        sureWrong: s.sureWrong.length }].slice(-KEEP_HISTORY);
+                                        sureWrong: s.sureWrong.length, ...(tier ? { tier } : {}) }].slice(-KEEP_HISTORY);
 }
 
 // What the learner already chose to go past today (Engine.pauseReason's ack); a new day starts clean.
@@ -1094,6 +1122,7 @@ $("importFile").addEventListener("change", async e => {
   state.rounds = {};  // rounds were drawn from the old progress
   round = null;
   if (!save()) return;
+  importedNote = true;
   renderChips(); openRound(); showUndoImport(); renderScores();
   $("backupStatus").textContent = `已匯入 ${Object.keys(data.progress).length} 張卡的成績。如有問題可按「復原到匯入前」。`;
 });
