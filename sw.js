@@ -1,7 +1,7 @@
 /// Copyright (c) 2026 si-kui-a. All rights reserved. The code is not open source; see README "授權".
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
-const CACHE = "swipe-cards-v13";
+const CACHE = "swipe-cards-v14";
 // scholar portraits shown with the exam progress (engine.test.js checks this list against img/)
 const PORTRAITS = ["comte", "marx", "durkheim", "weber", "quetelet", "nightingale", "dubois", "bourdieu", "goffman", "giddens"].map(n => `img/${n}.webp`);
 const FILES = ["./", "index.html", "engine.js", "cards.json", "cards-research.json", "cards-theory.json", "manifest.webmanifest", "icon.svg", "icon-192.png",

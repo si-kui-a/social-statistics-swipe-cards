@@ -55,6 +55,33 @@ ok("strong learner gets harder cards", pick({ theta: { 5: 1.5 } }).every(c => c.
 const due = E.buildRound(cards, { progress: { "1-0": { due: 0 }, "1-1": { due: 9e15 } } }, { now: 1, cap: 0 });
 ok("only due seen cards return", due.seen.map(c => c.id).join() === "1-0");
 
+// a scheduled round sized to today's budget: most-forgotten reviews, a protected share of new cards
+// spread between them (2026-10-16: every due card plus new ones ran past the daily limit)
+{
+  const D = E.DAY, now = 100 * D, labels = ["甲", "乙", "丙", "丁"];
+  const pool = Array.from({ length: 500 }, (_, i) => ({ id: `p${i}`, ch: 5, level: 2, label: labels[i % 4] }));
+  const progress = {};
+  // 200 due reviews: p0..p199, the higher the number the longer overdue (seen at box 2, 3-day interval),
+  // so deck order would pick the least overdue
+  for (let i = 0; i < 200; i++) progress[`p${i}`] = { box: 2, due: now - (i + 1) * 3600e3, log: [[now - 3 * D - (i + 1) * 3600e3, 1, 0]] };
+  const st = { progress, model: {} }, plan = o => E.planRound(pool, st, { now, cap: 15, random: () => 0.5, ...o });
+  const r = plan({ size: 60 }), isNew = c => !progress[c.id];
+  const nNew = r.list.filter(isNew).length;
+  ok("round: fits the day's remaining limit", r.list.length === 60 && r.review === 60 - nNew);
+  ok("round: backlog still leaves a fifth for new cards", nNew === Math.ceil(60 * E.NEW_SHARE));
+  const reviewIds = r.list.filter(c => !isNew(c)).map(c => Number(c.id.slice(1)));
+  ok("round: the most overdue reviews come first", Math.min(...reviewIds) >= 200 - (60 - nNew));
+  ok("forgetting curve: half recall when due, less when overdue",
+     Math.abs(E.recall({ box: 2, log: [[0, 1, 0]] }, 3 * D) - 0.5) < 1e-9 && E.recall({ box: 2, log: [[0, 1, 0]] }, 6 * D) < 0.5);
+  const pos = r.list.map((c, i) => (isNew(c) ? i : -1)).filter(i => i >= 0);
+  ok("round: opens on a review, new cards spread out", !isNew(r.list[0]) && pos.every((p, k) => !k || p - pos[k - 1] >= 3));
+  ok("round: no domain twice in a row", r.list.every((c, i) => !i || c.label !== r.list[i - 1].label));
+  ok("round: at or past the limit, the EXTRA the pause offers", plan({ size: -5 }).list.length === E.EXTRA);
+  ok("round: slowed learning caps new cards", plan({ size: 60, cap: 5 }).list.filter(isNew).length === 5);
+  const light = E.planRound(pool, { progress: { p0: progress.p0 }, model: {} }, { now, cap: 15, size: 60 });
+  ok("round: few reviews, new cards up to the adaptive cap", light.list.length === 16 && light.review === 1);
+}
+
 // volume
 const log = (n, right) => ({ c: { log: Array.from({ length: n }, (_, i) => [i, right, 0]) } });
 const up = E.adjustVolume({}, log(12, 1), 5, 15), down = E.adjustVolume({}, log(12, 0), 5, 15);
