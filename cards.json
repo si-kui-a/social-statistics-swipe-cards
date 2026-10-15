@@ -6679,36 +6679,67 @@
    "license": "CC BY-SA 4.0"
   },
   {
+   "name": "肖像：凱特勒（Joseph-Arnold Demannez 版畫，1875 年刊）",
+   "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
+   "license": "公有領域",
+   "url": "https://commons.wikimedia.org/wiki/File:Adolphe_Qu%C3%A9telet_by_Joseph-Arnold_Demannez.jpg"
+  },
+  {
    "name": "肖像：南丁格爾（約 1860）",
    "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
    "license": "公有領域",
    "url": "https://commons.wikimedia.org/wiki/File:Florence_Nightingale_three_quarter_length.jpg"
   },
   {
-   "name": "肖像：Gosset（Student）（1908 年攝，取自 1939 年 Annals of Eugenics 訃聞，攝影者不詳）",
+   "name": "肖像：杜波依斯（1918，C. M. Battey 攝）",
    "basis": "Wikimedia Commons 標示公有領域；縮成灰階小圖存在 App 內",
    "license": "公有領域",
-   "url": "https://commons.wikimedia.org/wiki/File:William_Sealy_Gosset.jpg"
+   "url": "https://commons.wikimedia.org/wiki/File:WEB_DuBois_1918.jpg"
+  },
+  {
+   "name": "名言：凱特勒《Sur l'homme》第二卷第三篇第三章",
+   "basis": "逐字核對 Internet Archive 1835 年版掃描（OCR 文字，s'efface 一詞依掃描頁更正）；中譯由 AI（Claude）翻譯",
+   "license": "原文公有領域；中譯 CC BY-SA 4.0",
+   "url": "https://archive.org/details/surlhommeetledv00quetgoog"
   },
   {
    "name": "名言：南丁格爾《Notes on Hospitals》第三版序",
-   "basis": "逐字核對 Internet Archive 的 1863 年版掃描；中譯為作者自譯",
+   "basis": "逐字核對 Internet Archive 的 1863 年版掃描；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://archive.org/details/b21297721"
   },
   {
-   "name": "名言：Gosset（Student）〈The Probable Error of a Mean〉導論",
-   "basis": "逐字核對 1908 年 Biometrika 原刊掃描；中譯為作者自譯",
+   "name": "名言：杜波依斯《The Souls of Black Folk》前言",
+   "basis": "逐字核對 Project Gutenberg 公有領域原文；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
-   "url": "https://doi.org/10.2307/2331554"
+   "url": "https://www.gutenberg.org/ebooks/408"
   }
  ],
  "voices": {
-  "nightingale": {
-   "name": "南丁格爾",
+  "quetelet": {
+   "name": "凱特勒",
+   "role": "社會統計的奠基者：「平均人」與社會物理學",
    "chapters": [
     "B1",
-    "D1",
+    "D1"
+   ],
+   "img": "img/quetelet.webp",
+   "穩": "個別的一天會有起伏，但許多天平均起來，你的進度相當穩定。",
+   "注意": "看平均數之前，先看分布：錯誤集中在哪幾章，比總分更有意義。",
+   "危險": "依照目前的平均速度推算，考前做不完。今天先完成建議的張數，讓平均數改變。",
+   "none": "一個觀察值說明不了什麼。先作答幾輪，規律才會出現。",
+   "sure": "一次的確信只是一個觀察值。把有把握卻答錯的題目累積起來，看它們的規律。",
+   "streak": "連續三輪都在危險區，這已經不是偶然的波動。把範圍縮小、每天做得完，平均數才會轉向。",
+   "quote": {
+    "text": "plus le nombre des individus est grand, plus la volonté individuelle s'efface et laisse prédominer la série des faits généraux",
+    "zh": "個體的數目越多，個人意志的影響就越淡，一般事實的序列就越占優勢。",
+    "src": "《Sur l'homme et le développement de ses facultés》第二卷第三篇第三章，1835"
+   }
+  },
+  "nightingale": {
+   "name": "南丁格爾",
+   "role": "以統計圖表推動公共衛生改革",
+   "chapters": [
     "D2",
     "D3"
    ],
@@ -6725,8 +6756,9 @@
     "src": "《Notes on Hospitals》第三版序，1863"
    }
   },
-  "gosset": {
-   "name": "Gosset（Student）",
+  "dubois": {
+   "name": "杜波依斯",
+   "role": "以社會調查與資料圖表研究種族不平等",
    "chapters": [
     "I1",
     "I2",
@@ -6735,17 +6767,17 @@
     "I5",
     "I6"
    ],
-   "img": "img/gosset.webp",
-   "穩": "你的結果穩定。不過別忘了：每一輪都只是母體中的一個樣本。",
-   "注意": "差異也許只是抽樣誤差，也許不是。多做幾輪，再判斷哪一章真的弱。",
-   "危險": "樣本告訴我們：照目前的速度考前做不完。今天先完成建議的張數。",
-   "none": "還沒有樣本，無從估計。先作答幾輪，我們再來算。",
-   "sure": "有把握卻答錯，代表你的估計有偏誤。回頭看公式的前提條件，再算一次。",
-   "streak": "三輪都是危險，樣本已經足以說明：目前的計畫做不完。縮小範圍或調低每日上限，再觀察幾輪。",
+   "img": "img/dubois.webp",
+   "穩": "你的結果穩定。仍要記得：結論只能推論到你抽樣的範圍。",
+   "注意": "差異可能只是抽樣誤差，也可能是真的。多做幾輪，再判斷哪一章真的弱。",
+   "危險": "資料說得很清楚：照目前的速度，考前做不完。今天先完成建議的張數。",
+   "none": "沒有調查就沒有結論。先作答幾輪，我們再來推論。",
+   "sure": "有把握卻答錯，代表推論前少檢查了一個前提。回頭看檢定的假設，再算一次。",
+   "streak": "三輪都是危險，證據已經足夠：目前的計畫做不完。縮小範圍或調低每日上限，再觀察幾輪。",
    "quote": {
-    "text": "Any experiment may be regarded as forming an individual of a \"population\" of experiments which might be performed under the same conditions.",
-    "zh": "任何一次實驗，都可以看作在相同條件下可能進行的所有實驗所組成的「母體」中的一個個體。",
-    "src": "〈The Probable Error of a Mean〉，Biometrika 第 6 卷第 1 期，1908"
+    "text": "the problem of the Twentieth Century is the problem of the color line.",
+    "zh": "二十世紀的問題，是膚色界線的問題。",
+    "src": "《The Souls of Black Folk》前言，1903"
    }
   }
  }

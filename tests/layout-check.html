@@ -201,7 +201,17 @@
       await W.eval(`openDeck(${JSON.stringify(deckName)})`);
       // every deck names its sources in the menu (出處與著作權, 2026-10-14)
       seen.push(`sources/${deckName} listed`);
-      if (!D.querySelectorAll("#deckSources li b").length) failures.push(`${deckName}: no sources listed under 出處與著作權`);
+      if (!D.querySelectorAll("#deckSources details b").length) failures.push(`${deckName}: no sources listed under 出處與著作權`);
+      // each person whose portrait is shown has one credit row (portrait licence first), and no portrait
+      // or quote entry is left among the plain sources (2026-10-16: credits only where a picture appears)
+      seen.push(`credits/${deckName} people`);
+      const figs = [...D.querySelectorAll("#deckFigures details")], plain = D.getElementById("deckSources").textContent;
+      for (const v of Object.values(W.eval("voices"))) {
+        if (!v.role) failures.push(`${deckName}: ${v.name} has no contribution line (role)`);
+        const row = figs.find(d => d.querySelector("summary b").firstChild.textContent === v.name);
+        if (v.img && !(row && /肖像（.+）：.*來源/.test(row.textContent))) failures.push(`${deckName}: ${v.name}'s portrait has no credit row`);
+      }
+      if (/肖像：|名言：/.test(plain)) failures.push(`${deckName}: portrait or quote credits listed among the sources`);
       // exam progress in its three data states (改善規劃.md stage A acceptance): no records, cached records
       // with three 危險 rounds in a row, and records imported from a file with nothing in the last 7 days.
       if (Object.keys(W.eval("voices")).length && W.eval("!!progressScope()")) {
@@ -227,7 +237,9 @@
           if (!img) { failures.push(`${deckName} ${name}: no portrait`); continue; }
           await new Promise(r => img.complete ? r() : (img.onload = img.onerror = r));
           if (!img.naturalWidth) failures.push(`${deckName} ${name}: portrait ${img.getAttribute("src")} did not load`);
-          if (!box.querySelector(".voice .quote")) failures.push(`${deckName} ${name}: no sourced quote`);
+          const shownVoice = W.eval("voiceFor(round, allCards().filter(c => scopeHas(progressScope(), c)))");
+          if (shownVoice.quote && !box.querySelector(".voice .quote")) failures.push(`${deckName} ${name}: no sourced quote`);
+          if (!box.querySelector(".voice .role")) failures.push(`${deckName} ${name}: no contribution line beside the name`);
           // Count the lines the text actually breaks into (the text fragments' vertical positions), not
           // height / line height: on CI a fallback font made a two-line box 3.5 "lines" tall (2026-10-15).
           const line = box.querySelector(".prog-line"), range = D.createRange();
