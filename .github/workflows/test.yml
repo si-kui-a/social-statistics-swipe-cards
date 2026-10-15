@@ -18,5 +18,8 @@ jobs:
           persist-credentials: false
       # Same command as a local run; the runner's preinstalled Node is enough (no dependencies)
       - run: node engine.test.js
+      # The runner ships no CJK font, so Chinese fell back to a wide font and a two-line summary broke
+      # into four lines (2026-10-15); Noto CJK is what Android phones render with
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
       # Phone layout (390x844): the runner's preinstalled Chrome, still no dependencies
       - run: node layout.test.js
