@@ -659,10 +659,10 @@ function progressHtml(r) {
   const note = importedNote ? `<p class="small">依匯入的成績計算。</p>` : "";
   importedNote = false;
   return `<div class="progress-box"><div class="meta"><span>考試進度</span><span>${esc(s.title)}</span></div>
-    <p class="prog-line"><b>還有 ${p.daysLeft} 天</b>｜未熟悉或考前到期 ${p.work} 張｜${p.tier
+    <p class="prog-line"><b>還有 ${p.daysLeft} 天</b>｜待學 ${p.work} 張｜${p.tier
       ? `<span class="tier t-${p.tier}">危機：${p.tier}</span>` : "暫不判斷危機度"}｜今天建議 ${p.perDay} 張</p>
     ${p.paceFrom === "all" ? `<p class="small">近 7 天沒有作答，改用全部紀錄的平均速度（每天約 ${p.pace} 張）估計，僅供參考。</p>`
-      : p.tier ? `<p class="small">近 7 天每天約 ${p.pace} 張${p.unstable ? `；只有 ${p.activeDays} 天有作答，速度估計不穩` : ""}。</p>` : ""}${note}${next}
+      : p.tier ? `<p class="small">待學＝還沒熟悉或考前會到期的卡。近 7 天每天約 ${p.pace} 張${p.unstable ? `；只有 ${p.activeDays} 天有作答，速度估計不穩` : ""}。</p>` : ""}${note}${next}
     ${say ? voiceHtml(v, say) : ""}</div>`;
 }
 
