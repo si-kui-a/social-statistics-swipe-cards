@@ -9347,6 +9347,7 @@
    "none": "實證從觀察開始：先作答幾輪，我們才有資料可以判斷。",
    "sure": "確信不等於證明。把你以為懂的，拿去和事實比對一次。",
    "img": "img/comte.webp",
+   "role": "提出「社會學」一詞與實證主義",
    "quote": {
     "text": "science, d'où prévoyance; prévoyance, d'où action",
     "zh": "科學，故能預見；預見，故能行動。",
@@ -9362,6 +9363,7 @@
    "none": "先做幾輪，物質條件——你的作答紀錄——才看得清楚。",
    "sure": "你對自己理解的信心，恐怕是一種虛假意識。回到條件本身，再想一次。",
    "img": "img/marx.webp",
+   "role": "衝突論：階級、生產方式與異化",
    "quote": {
     "text": "Die Philosophen haben die Welt nur verschieden interpretiert; es kommt aber darauf an, sie zu verändern.",
     "zh": "哲學家們只是用不同的方式解釋世界，問題在於改變世界。",
@@ -9377,6 +9379,7 @@
    "none": "社會事實要從資料看：先作答幾輪，再來判斷你的狀態。",
    "sure": "個人的確信不能代替事實。把答錯的當作社會事實來檢視，找出它的原因。",
    "img": "img/durkheim.webp",
+   "role": "社會事實、連帶與脫序；以統計研究自殺",
    "quote": {
     "text": "La première règle et la plus fondamentale est de considérer les faits sociaux comme des choses.",
     "zh": "第一條、也是最根本的規則，是把社會事實當作事物來看待。",
@@ -9392,6 +9395,7 @@
    "none": "理解要從行動開始：先作答，再詮釋你的錯誤。",
    "sure": "以為理解了，其實只是直接理解；試著說出概念背後的動機與脈絡。",
    "img": "img/weber.webp",
+   "role": "詮釋社會學：理念型、理性化與科層制",
    "quote": {
     "text": "Die Politik bedeutet ein starkes langsames Bohren von harten Brettern mit Leidenschaft und Augenmaß zugleich.",
     "zh": "政治是同時帶著熱情與判斷力，緩慢而有力地鑽透硬木板。",
@@ -9448,25 +9452,25 @@
   },
   {
    "name": "名言：孔德《實證哲學教程》第一卷第二講",
-   "basis": "逐字核對 Project Gutenberg 公有領域原文；中譯為作者自譯",
+   "basis": "逐字核對 Project Gutenberg 公有領域原文；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://www.gutenberg.org/ebooks/31881"
   },
   {
    "name": "名言：馬克思〈關於費爾巴哈的提綱〉第十一條（恩格斯 1888 年刊本）",
-   "basis": "逐字核對 marxists.org 德文原文；中譯為作者自譯",
+   "basis": "逐字核對 marxists.org 德文原文；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://www.marxists.org/deutsch/archiv/marx-engels/1845/thesen/thesfeue.htm"
   },
   {
    "name": "名言：涂爾幹《社會學方法的規則》第二章",
-   "basis": "逐字核對法文維基文庫公有領域原文；中譯為作者自譯",
+   "basis": "逐字核對法文維基文庫公有領域原文；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://fr.wikisource.org/wiki/Les_R%C3%A8gles_de_la_m%C3%A9thode_sociologique/Chapitre_2"
   },
   {
    "name": "名言：韋伯《以政治為志業》",
-   "basis": "逐字核對德文維基文庫公有領域原文；中譯為作者自譯",
+   "basis": "逐字核對德文維基文庫公有領域原文；中譯由 AI（Claude）翻譯",
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://de.wikisource.org/wiki/Politik_als_Beruf"
   }

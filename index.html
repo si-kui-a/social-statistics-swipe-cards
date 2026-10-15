@@ -127,9 +127,24 @@ textarea { min-height: 70px; resize: vertical; }
 .facts dt { font-weight: 700; }
 .facts dd { margin: 0; color: var(--muted); }
 .facts-head { margin: 4px 0 0; font-size: .9rem; }
-.sources { margin: 0; padding-left: 1.2em; font-size: .85rem; display: grid; gap: 6px; }
-.sources span { display: block; color: var(--muted); }
-.sources a { color: var(--accent); overflow-wrap: anywhere; }
+.links { display: grid; gap: 8px; }
+button.link { position: relative; display: block; width: 100%; text-align: left; font: inherit; font-weight: 700; color: var(--ink);
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 36px 10px 16px; cursor: pointer; }
+button.link span { display: block; font-size: .78rem; font-weight: 400; color: var(--muted); }
+button.link::after { content: "›"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 1.3rem; color: var(--muted); }
+#page { min-height: 100dvh; border-radius: 0; }
+#page .sheet-head { position: sticky; top: 0; background: var(--paper); padding: 4px 0; z-index: 1; }
+button.back { font: inherit; font-weight: 700; color: var(--accent); background: none; border: 0; padding: 6px 0; cursor: pointer; }
+.rows { display: grid; background: var(--card); border: 1px solid var(--line); border-radius: 12px; font-size: .85rem; }
+.rows > p { margin: 0; padding: 10px 12px; color: var(--muted); }
+.rows details + details { border-top: 1px solid var(--line); }
+.rows summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.rows summary::-webkit-details-marker { display: none; }
+.rows summary small { display: block; font-weight: 400; font-size: .75rem; color: var(--muted); }
+.rows details p { margin: 0; padding: 0 12px 8px; font-size: .8rem; color: var(--muted); }
+.rows a { color: var(--accent); white-space: nowrap; }
+.tag { flex: none; max-width: 45%; font-size: .72rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; text-align: center; }
+.voice .role { display: block; font-size: .72rem; color: var(--muted); }
 table.t { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
 table.t th, table.t td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
 table.t td.n, table.t th.n { text-align: right; }
@@ -213,8 +228,38 @@ table.t td.n, table.t th.n { text-align: right; }
       </div>
     </details>
     <details class="box">
-      <summary>怎麼用</summary>
+      <summary>自己做一張卡</summary>
+      <form class="stack" id="addForm">
+        <label for="addChapter">章節<select id="addChapter"></select></label>
+        <label for="addQ">問題（用自己的話寫）<textarea id="addQ" required></textarea></label>
+        <label for="addA">答案（附一句「因為……」）<textarea id="addA" required></textarea></label>
+        <button class="big" type="submit">加入</button>
+        <div class="status" id="addStatus"></div>
+      </form>
+    </details>
+    <details class="box">
+      <summary>成績備份與搬移</summary>
       <div class="stack">
+        <p class="small">成績只存在這支手機、不會上傳。建議每週匯出一次；換手機時用「匯入成績」還原。</p>
+        <button class="big sure" id="export" type="button">匯出成績</button>
+        <button class="big" id="copy" type="button">複製成績文字</button>
+        <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
+        <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
+        <div class="status" id="backupStatus"></div>
+      </div>
+    </details>
+    <nav class="links" aria-label="說明">
+      <button type="button" class="link" data-page="help">怎麼用<span>作答、出題方式、畫面數字、停下與分析</span></button>
+      <button type="button" class="link" data-page="credits">出處與著作權<span>題目來源、授權、人物圖片</span></button>
+    </nav>
+    <p class="small" id="offline"></p>
+  </div>
+</dialog>
+<!-- Rarely needed help and credits live on their own page so the menu stays short (2026-10-16 request) -->
+<dialog id="page" aria-labelledby="pageTitle">
+  <div class="sheet">
+    <div class="sheet-head"><button class="back" id="pageBack" type="button">‹ 選單</button><span id="pageTitle"></span><button class="menu-btn" id="closePage" type="button" aria-label="關閉">✕</button></div>
+    <section class="stack" id="page-help" hidden>
         <h4 class="facts-head">作答</h4>
         <dl class="facts">
           <dt>選擇・計算・申論</dt><dd>作答後按「有把握／不確定」送出，自動批改</dd>
@@ -240,51 +285,15 @@ table.t td.n, table.t th.n { text-align: right; }
           <dt>有把握卻錯</dt><dd>隔 3 張再出一次</dd>
           <dt>分析</dt><dd>易錯章節與錯因，各附一個「先想」的問題</dd>
         </dl>
-      </div>
-    </details>
-    <details class="box">
-      <summary>自己做一張卡</summary>
-      <form class="stack" id="addForm">
-        <label for="addChapter">章節<select id="addChapter"></select></label>
-        <label for="addQ">問題（用自己的話寫）<textarea id="addQ" required></textarea></label>
-        <label for="addA">答案（附一句「因為……」）<textarea id="addA" required></textarea></label>
-        <button class="big" type="submit">加入</button>
-        <div class="status" id="addStatus"></div>
-      </form>
-    </details>
-    <details class="box">
-      <summary>成績備份與搬移</summary>
-      <div class="stack">
-        <dl class="facts">
-          <dt>存在哪</dt><dd>只在這支手機，不會上傳</dd>
-          <dt>建議</dt><dd>每週匯出一次，存到雲端或傳給自己</dd>
-          <dt>換手機</dt><dd>用「匯入成績」還原</dd>
-        </dl>
-        <button class="big sure" id="export" type="button">匯出成績</button>
-        <button class="big" id="copy" type="button">複製成績文字</button>
-        <label for="importFile">匯入成績（選擇之前匯出的檔案）<input id="importFile" type="file" accept="application/json,.json"></label>
-        <button class="big" id="undoImport" type="button" hidden>復原到匯入前</button>
-        <div class="status" id="backupStatus"></div>
-      </div>
-    </details>
-    <details class="box" id="sourcesBox">
-      <summary>出處與著作權</summary>
-      <div class="stack">
-        <h4 class="facts-head">規範</h4>
-        <dl class="facts">
-          <dt>國考試題</dt><dd>依法令舉行的考試試題，著作權法第 9 條不受保護</dd>
-          <dt>開放教材</dt><dd>依原授權改寫並標明出處；CC BY-SA 須以同授權分享</dd>
-          <dt>自編題目</dt><dd>只依讀本章節出題，不收教科書原文與原題</dd>
-          <dt>AI 解說</dt><dd>解說、評分要點由 AI 撰寫，非官方</dd>
-          <dt>每張卡</dt><dd>翻面後的「出處」列出年度、考試或教材</dd>
-          <dt>本站授權</dt><dd>自編內容 CC BY-SA 4.0：可分享改寫，須標示出處並同授權</dd>
-          <dt>回報</dt><dd>每張卡翻面後按「回報這題有誤或有疑慮」，或到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue；確認後立即修正或移除</dd>
-        </dl>
-        <h4 class="facts-head" id="sourcesTitle">本題庫的來源</h4>
-        <ul class="sources" id="deckSources"></ul>
-      </div>
-    </details>
-    <p class="small" id="offline"></p>
+      </section>
+    <section class="stack" id="page-credits" hidden>
+      <p class="small">國考試題依著作權法第 9 條不受保護；其餘題目、解說與評分要點多由 AI（Claude）撰寫，非官方，以 CC BY-SA 4.0 釋出（可分享改寫，須標示出處並同授權）。App 程式保留所有權利。</p>
+      <h4 class="facts-head" id="sourcesTitle">題目來源</h4>
+      <div class="rows" id="deckSources"></div>
+      <h4 class="facts-head" id="figuresTitle" hidden>人物圖片與引文</h4>
+      <div class="rows" id="deckFigures"></div>
+      <p class="small">每張卡翻面後的「出處」列出年度、考試或教材。發現錯誤或有疑慮：翻面後按「回報這題有誤或有疑慮」，或到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue，確認後立即修正或移除。</p>
+    </section>
   </div>
 </dialog>
 
@@ -653,9 +662,11 @@ function examStatus() {
   return { s, inS, p: Engine.examProgress(inS, state.progress, new Date(`${s.date}T23:59:59`).getTime()) };
 }
 function voiceHtml(v, say) {
-  const img = /^img\/[\w-]+\.webp$/.test(v.img || "") ? `<img src="${esc(v.img)}" alt="${esc(v.name)}的肖像（公有領域）" width="48" height="60" loading="lazy">` : "";
+  const img = PORTRAIT.test(v.img || "") ? `<img src="${esc(v.img)}" alt="${esc(v.name)}的肖像" width="48" height="60" loading="lazy">` : "";
   const q = v.quote ? `<span class="quote">${esc(v.name)}：「${esc(v.quote.zh)}」<i>${esc(v.quote.text)}（${esc(v.quote.src)}）</i></span>` : "";
-  return `<blockquote class="voice">${img}「${esc(say)}」<cite>虛構評語：以${esc(v.name)}口吻撰寫，非本人言論</cite>${q}</blockquote>`;
+  // role: the person's contribution in small type, so a name the learner has not met still means something
+  const who = v.role ? `<span class="role">${esc(v.name)}｜${esc(v.role)}</span>` : "";
+  return `<blockquote class="voice">${img}${who}「${esc(say)}」<cite>虛構評語：以${esc(v.name)}口吻撰寫，非本人言論</cite>${q}</blockquote>`;
 }
 function progressHtml(r) {
   const st = examStatus();
@@ -1169,12 +1180,46 @@ function reportUrl(c) {
 }
 
 // The deck file names its sources (each course repository's exporter writes "sources"), shown under 出處與著作權.
-function renderSources(list) {
-  $("sourcesTitle").textContent = `「${D().title}」的來源`;
-  $("deckSources").innerHTML = list.length ? list.map(s => `<li><b>${esc(s.name)}</b><span>${esc(s.license)}・${esc(s.basis)}</span>`
-    + (/^https:\/\//.test(s.url || "") ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a>` : "") + "</li>").join("")
-    : "<li>題卡檔還沒列出來源；每張卡翻面後的「出處」仍可查。</li>";
+// Credits page: one line per source (name and licence), the basis and link only when tapped, so the page
+// scans like an app's licence list (2026-10-16 request). Portrait and quote entries are grouped per person
+// and listed only for people whose portrait the app shows; a person without a picture needs no credit.
+const PORTRAIT = /^img\/[\w-]+\.webp$/;
+function sourceLink(s) {
+  return /^https:\/\//.test(s.url || "") ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">來源 ↗</a>` : "";
 }
+function creditRow(title, tag, body) {
+  return `<details><summary><b>${title}</b><span class="tag">${esc(tag)}</span></summary>${body}</details>`;
+}
+function renderSources(list) {
+  $("sourcesTitle").textContent = `「${D().title}」的題目來源`;
+  const person = s => (/^(肖像|名言)：/.test(s.name) ? s.name.slice(3).split(/[（《〈]/)[0] : null);
+  const shown = new Map(Object.values(voices).filter(v => PORTRAIT.test(v.img || "")).map(v => [v.name, v]));
+  const plain = list.filter(s => !person(s));
+  $("deckSources").innerHTML = plain.length
+    ? plain.map(s => creditRow(esc(s.name), s.license, `<p>${esc(s.basis)}${sourceLink(s)}</p>`)).join("")
+    : "<p>題卡檔還沒列出來源；每張卡翻面後的「出處」仍可查。</p>";
+  const rows = [...shown.values()].map(v => {
+    const mine = list.filter(s => person(s) === v.name);
+    const img = mine.find(s => s.name.startsWith("肖像："));
+    if (!img) return "";
+    // the tag already carries the portrait's licence; a quote's (original + translation) differs, so it stays
+    const body = mine.map(s => `<p>${esc(s.name.slice(0, 2))}${esc(s.name.slice(3 + v.name.length))}：`
+      + `${s === img ? "" : `${esc(s.license)}；`}${esc(s.basis)}${sourceLink(s)}</p>`).join("");
+    return creditRow(`${esc(v.name)}${v.role ? `<small>${esc(v.role)}</small>` : ""}`, img.license, body);
+  }).join("");
+  $("figuresTitle").hidden = !rows;
+  $("deckFigures").innerHTML = rows;
+}
+function openPage(id) {
+  const title = { help: "怎麼用", credits: "出處與著作權" }[id];
+  for (const k of ["help", "credits"]) $(`page-${k}`).hidden = k !== id;
+  $("pageTitle").textContent = title;
+  $("menu").close(); $("page").showModal(); $("page").scrollTop = 0;
+}
+document.querySelectorAll("[data-page]").forEach(b => b.addEventListener("click", () => openPage(b.dataset.page)));
+$("pageBack").addEventListener("click", () => { $("page").close(); $("openMenu").click(); });
+$("closePage").addEventListener("click", () => $("page").close());
+$("page").addEventListener("click", e => { if (e.target === $("page")) $("page").close(); });
 
 async function openDeck(id) {
   if (round) save();
