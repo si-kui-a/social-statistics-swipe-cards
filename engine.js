@@ -1,3 +1,4 @@
+/// Copyright (c) 2026 si-kui-a. All rights reserved. The code is not open source; see README "授權".
 // Grading and adaptive scheduling for the swipe app: pure functions, no page access, so engine.test.js
 // can check them with Node. index.html loads this file as a plain script (window.Engine).
 //

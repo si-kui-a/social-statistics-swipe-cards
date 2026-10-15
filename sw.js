@@ -1,3 +1,4 @@
+/// Copyright (c) 2026 si-kui-a. All rights reserved. The code is not open source; see README "授權".
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
 const CACHE = "swipe-cards-v12";
