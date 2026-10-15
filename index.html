@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- Only this site's own files may load; the one outside call is the opt-in anonymous report to Apps
+     Script (connect-src). Inline script and style stay allowed: the app is one file (2026-10-16 audit). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="可離線的社會統計、社會學理論與研究法練習卡：國考原題附出處，AI 解說，成績只存在你的裝置。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="社會統計滑卡">
+<meta property="og:description" content="可離線的社會統計、社會學理論與研究法練習卡：國考原題附出處，AI 解說，成績只存在你的裝置。">
+<meta property="og:url" content="https://si-kui-a.github.io/social-statistics-swipe-cards/">
+<meta property="og:image" content="https://si-kui-a.github.io/social-statistics-swipe-cards/icon-512.png">
 <meta name="theme-color" content="#1d2f45">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="統計滑卡">

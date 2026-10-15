@@ -251,6 +251,10 @@
       }
     }
     W.localStorage.clear();
+    // Nothing the app loads or sends may be blocked by its own Content-Security-Policy (2026-10-16)
+    const csp = W.__csp || ["violation log missing: the test server did not inject it"];
+    if (csp.length) failures.push(`CSP blocked: ${csp.join("; ")}`);
+    else seen.push("csp: no violations");
     out.textContent = JSON.stringify({ seen, failures });
   } catch (e) {
     out.textContent = JSON.stringify({ seen: [], failures: [`check crashed: ${e}`] });

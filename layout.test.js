@@ -28,12 +28,27 @@ const server = http.createServer((req, res) => {
     res.writeHead(404); res.end(); return;
   }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
+  if (file === path.join(ROOT, "index.html")) {
+    // The check page reads the app's let-scoped state through eval, which the shipped CSP forbids, so the
+    // served copy allows eval and records every CSP violation for the check page (window.__csp).
+    res.end(fs.readFileSync(file, "utf8")
+      .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' 'unsafe-eval'")
+      .replace("<head>", "<head><script>window.__csp=[];document.addEventListener('securitypolicyviolation',"
+        + "e=>window.__csp.push(e.violatedDirective+' '+e.blockedURI))</script>"));
+    return;
+  }
   fs.createReadStream(file).pipe(res);
 });
 
 // A syntax error in the check page or the app stops the page before it writes a result, and the run
 // only says "produced no result", which looks like a timeout (2026-10-14: a second `const row`).
 // Compile every inline script first so the error names itself.
+// The shipped page keeps a CSP without eval; the test server only loosens its own copy.
+const csp = (fs.readFileSync(path.join(ROOT, "index.html"), "utf8").match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1];
+if (!csp || /unsafe-eval/.test(csp) || !/default-src 'self'/.test(csp)) {
+  console.log("FAIL index.html: needs a Content-Security-Policy with default-src 'self' and no 'unsafe-eval'");
+  process.exit(1);
+}
 for (const page of ["tests/layout-check.html", "index.html"]) {
   const html = fs.readFileSync(path.join(ROOT, page), "utf8");
   for (const [, code] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {

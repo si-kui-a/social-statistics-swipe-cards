@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-15",
+ "generated": "2026-10-16",
  "deck": "theory",
  "count": 352,
  "cards": [
@@ -9413,8 +9413,8 @@
    "url": "https://open.oregonstate.education/sociologicaltheory"
   },
   {
-   "name": "依課程讀本章節自編的問答題（Giddens《資本主義與現代社會理論》等）",
-   "basis": "作者自行撰寫，只依讀本的章節主題出題，不收讀本原文",
+   "name": "依課程讀本章節出題的問答題（Giddens《資本主義與現代社會理論》等）",
+   "basis": "AI（Claude）撰寫，只依讀本的章節主題出題，不收讀本原文",
    "license": "CC BY-SA 4.0"
   },
   {
