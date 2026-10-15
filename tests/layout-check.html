@@ -226,7 +226,7 @@
           const line = box.querySelector(".prog-line"), probe = line.cloneNode(false);
           probe.textContent = "測"; probe.style.cssText = "position:absolute;visibility:hidden;width:auto;white-space:nowrap";
           line.parentNode.appendChild(probe); const lh = probe.getBoundingClientRect().height; probe.remove();
-          if (line.getBoundingClientRect().height > 2.5 * lh) failures.push(`${deckName} ${name}: summary line wraps past two lines`);
+          if (line.getBoundingClientRect().height > 2.5 * lh) failures.push(`${deckName} ${name}: summary line wraps past two lines (${Math.round(line.getBoundingClientRect().height)}px, one line ${Math.round(lh)}px, ${Math.round(line.getBoundingClientRect().width)}px wide): ${line.textContent}`);
           if (box.getBoundingClientRect().right > W.innerWidth + 0.5) failures.push(`${deckName} ${name}: progress box wider than the screen`);
         }
       }
