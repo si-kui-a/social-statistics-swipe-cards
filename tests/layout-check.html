@@ -233,7 +233,9 @@
             const last = lines[lines.length - 1];
             if (last && m - last.mid < 8) last.n++; else lines.push({ mid: m, n: 1 });
           }
-          if (lines.length > 2) failures.push(`${deckName} ${name}: summary line breaks into ${lines.length} lines: ${line.textContent}`);
+          const cs = W.getComputedStyle(line), info = `${lines.length} lines, ${Math.round(line.getBoundingClientRect().width)}px wide, font ${cs.fontSize} ${cs.fontFamily}, word-break ${cs.wordBreak}, lang ${line.closest("[lang]") ? line.closest("[lang]").lang : "-"}, fragments ${[...range.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top) + ":" + Math.round(x.width)).join(" ")}`;
+          seen.push(`progress/${deckName} ${name} ${info}`);
+          if (lines.length > 2) failures.push(`${deckName} ${name}: summary line breaks into ${info}: ${line.textContent}`);
           if (box.getBoundingClientRect().right > W.innerWidth + 0.5) failures.push(`${deckName} ${name}: progress box wider than the screen`);
         }
       }
