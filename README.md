@@ -112,7 +112,7 @@
 |---|---|
 | AI 撰寫的題目、解說與題卡檔（`cards.json`、`cards-research.json`、`cards-theory.json` 中非國考原題的部分；改寫自 Hurst 開放教科書的題目依其 CC BY-SA 4.0 授權並標明出處） | [CC BY-SA 4.0](LICENSE)：可以分享、改寫，要標示出處，改寫後用同一授權 |
 | 國考與技能檢定原題 | 依著作權法第 9 條不受著作權保護；題卡上附的 AI 解說屬於上一列 |
-| 程式（`index.html`、`engine.js`、`sw.js` 等） | 尚未選定開源授權 |
+| 程式（`index.html`、`engine.js`、`sw.js`、`apps-script/` 等） | 保留所有權利（All rights reserved）：可以使用這個網站，但未經同意不得複製、修改或散布程式碼。`LICENSE` 的 CC BY-SA 4.0 只適用上面兩列的內容 |
 
 著作權人：si-kui-a，2026。純由 AI 產生、沒有人類創作貢獻的部分，著作權法可能不保護；CC BY-SA 4.0 也允許他人商用與再散布。
 

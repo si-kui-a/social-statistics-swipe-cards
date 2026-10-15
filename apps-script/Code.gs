@@ -1,3 +1,4 @@
+// Copyright (c) 2026 si-kui-a. All rights reserved. The code is not open source; see README "授權".
 // Receives the swipe app's anonymous attempt rows (opt-in) and appends them to the sheet "attempts" of
 // the spreadsheet this script is bound to; the private course repository pulls them with the read key
 // (scripts/shared_attempts.py there). No secret lives in this file: READ_KEY is a script property.
