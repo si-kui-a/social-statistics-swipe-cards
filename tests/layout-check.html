@@ -222,8 +222,11 @@
           await new Promise(r => img.complete ? r() : (img.onload = img.onerror = r));
           if (!img.naturalWidth) failures.push(`${deckName} ${name}: portrait ${img.getAttribute("src")} did not load`);
           if (!box.querySelector(".voice .quote")) failures.push(`${deckName} ${name}: no sourced quote`);
-          const line = box.querySelector(".prog-line"), lh = parseFloat(W.getComputedStyle(line).lineHeight) || 1.5 * parseFloat(W.getComputedStyle(line).fontSize);
-          if (line.getBoundingClientRect().height > 2 * lh + 1) failures.push(`${deckName} ${name}: summary line wraps past two lines`);
+          // one line of the same style as the yardstick: "normal" line height differs between fonts (CI vs local)
+          const line = box.querySelector(".prog-line"), probe = line.cloneNode(false);
+          probe.textContent = "測"; probe.style.cssText = "position:absolute;visibility:hidden;width:auto;white-space:nowrap";
+          line.parentNode.appendChild(probe); const lh = probe.getBoundingClientRect().height; probe.remove();
+          if (line.getBoundingClientRect().height > 2.5 * lh) failures.push(`${deckName} ${name}: summary line wraps past two lines`);
           if (box.getBoundingClientRect().right > W.innerWidth + 0.5) failures.push(`${deckName} ${name}: progress box wider than the screen`);
         }
       }
