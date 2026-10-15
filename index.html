@@ -269,7 +269,7 @@ table.t td.n, table.t th.n { text-align: right; }
         </dl>
         <h4 class="facts-head">出題方式</h4>
         <dl class="facts">
-          <dt>排程複習</dt><dd>到期複習卡＋新卡；答對後隔 1、3、7、14、30 天再出現</dd>
+          <dt>排程複習</dt><dd>一輪＝今天還能做的張數：最可能忘記的複習卡先出，至少兩成新卡平均穿插；答對後隔 1、3、7、14、30 天再出現</dd>
           <dt>全部刷完</dt><dd>範圍內每張各一次，中途離開下次接著做</dd>
           <dt>單章／多章</dt><dd>只練一章或幾章混合；各自記住進度</dd>
           <dt>模擬考</dt><dd>限時、不顯示對錯；交卷後看各大題得分</dd>
@@ -442,9 +442,10 @@ function newRound(opts = {}) {
   else if (pace === "all") list = Engine.fullPass(cards, state, { now });
   else {
     state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
-    const r = Engine.buildRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue });
-    review = r.seen.length;
-    list = Engine.interleave(shuffle(r.seen.concat(r.fresh)));
+    const t = Engine.since(state.progress, dayStart()), limit = ack().limit || ui().dailyMax;
+    const r = Engine.planRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue, size: limit - t.n });
+    review = r.review;
+    list = r.list;
   }
   return { pace, label, started: now, total: list.length, review, ids: list.map(c => c.id),
            current: null, results: [], retried: [], done: false, retry: !!opts.ids, exam };

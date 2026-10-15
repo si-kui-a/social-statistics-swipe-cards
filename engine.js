@@ -193,6 +193,62 @@
     return { seen, fresh: pickFresh(fresh, domainStats(cards, progress), opts.cap) };
   }
 
+  // A scheduled round sized to what is left of today's limit (2026-10-16 request: a round of every due
+  // card plus new ones ran past the limit, so the day stopped mid-round and mostly on old cards).
+  //   forgetting  due reviews most likely forgotten first: recall is modelled as 2^(-elapsed / half-life)
+  //               with the half-life set to the card's interval, so a card is due at 50% and an overdue
+  //               or lower-box card ranks ahead (the exponential forgetting curve; FSRS uses the same idea).
+  //   learning    new cards are never squeezed out by a backlog: at least NEW_SHARE of the round, within
+  //               the adaptive newPerRound (adjustVolume slows new cards when accuracy drops), spread
+  //               evenly between reviews so each new card meets a familiar one on both sides.
+  // size: today's remaining limit; at or past the limit the round holds EXTRA cards, which the
+  // limit pause offers first. Returns the ordered cards and how many of them are reviews.
+  const NEW_SHARE = 0.2;
+  function recall(p, now) {
+    const half = Math.max(INTERVAL_DAYS[p.box || 0], 0.5) * DAY;
+    // last review from the log; without one, back from the due date by the interval
+    const last = p.log && p.log.length ? Math.max(...p.log.map(e => e[0])) : p.due !== undefined ? p.due - INTERVAL_DAYS[p.box || 0] * DAY : now;
+    return Math.pow(2, -(Math.max(0, now - last)) / half);
+  }
+  function planRound(cards, state, opts) {
+    const now = opts.now, progress = state.progress;
+    const size = Math.max(opts.size, EXTRA);
+    const reviews = buildRound(cards, state, { ...opts, cap: 0 }).seen
+      .sort((a, b) => recall(progress[a.id], now) - recall(progress[b.id], now));
+    const unseen = cards.filter(c => !progress[c.id]).length;
+    const nNew = Math.min(opts.cap, unseen, Math.max(Math.ceil(size * NEW_SHARE), size - reviews.length));
+    const fresh = nNew ? buildRound(cards, state, { ...opts, cap: nNew }).fresh : [];
+    const old = reviews.slice(0, Math.max(0, size - fresh.length));
+    return { list: spread(interleave(shuffleBy(old, opts.random)), interleave(fresh)), review: old.length };
+  }
+  // Order within the most-forgotten set does not matter, so it is shuffled before interleaving by domain.
+  function shuffleBy(list, random) {
+    const out = list.slice(), rand = random || Math.random;
+    for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+    return out;
+  }
+  // New cards at even gaps between reviews (none first, so a round opens on something familiar), then
+  // a pass that swaps a card away from a same-domain neighbour with one of its own kind (new or review)
+  // that fits both places.
+  function spread(old, fresh) {
+    const out = [], isNew = new Set(fresh);
+    let o = 0;
+    fresh.forEach((c, i) => {
+      const before = old.length ? Math.max(1, Math.floor((i + 1) * old.length / (fresh.length + 1))) : 0;
+      while (o < before) out.push(old[o++]);
+      out.push(c);
+    });
+    while (o < old.length) out.push(old[o++]);
+    const d = k => (k >= 0 && k < out.length ? domainOf(out[k]) : null);
+    for (let i = 1; i < out.length; i++) {
+      if (d(i) !== d(i - 1)) continue;
+      const j = out.findIndex((c, k) => Math.abs(k - i) > 1 && isNew.has(c) === isNew.has(out[i]) && d(k) !== d(i - 1) && d(k) !== d(i + 1)
+        && d(i) !== d(k - 1) && d(i) !== d(k + 1));
+      if (j >= 0) [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
   function recentScores(progress, limit) {
     const all = [];
     for (const p of Object.values(progress)) for (const e of p.log || []) all.push([e[0], e.length > 3 ? e[3] : e[1]]);
@@ -464,6 +520,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
