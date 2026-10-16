@@ -14,19 +14,27 @@
 // validRow on the rows Engine.shareRow makes, so the two sides cannot drift apart unnoticed.
 var FIELDS = ["id", "install", "deck", "card", "day", "right", "sure", "score", "answer", "first", "level"];
 var MAX_ROWS = 200;   // per request
-var DAILY_CAP = 600;  // rows per install code per day: one heavy day of practice, not a flood
-var PULL_MAX = 5000;  // rows per read
+// Caps are enforced with CacheService, whose TTL maxes out at 21600s (6h), so each is a rolling 6h
+// window, not a hard calendar day. Day-keyed so counts fall off naturally; a best-effort flood bound.
+var DAILY_CAP = 600;     // rows per install code per window: one heavy session, not a flood
+var GLOBAL_CAP = 20000;  // rows across all installs per window: the install code is caller-chosen, so
+                         // the per-install cap alone is bypassed by rotating codes; this bounds the total
+var CAP_TTL = 21600;     // 6h, the CacheService maximum
+var PULL_MAX = 5000;     // rows per read
 
 function validRow(r) {
   if (!r || typeof r !== "object") return false;
   var keys = Object.keys(r);
   if (keys.length !== FIELDS.length || !keys.every(function (k) { return FIELDS.indexOf(k) >= 0; })) return false;
   var bit = function (x) { return x === 0 || x === 1; };
+  // answer is written straight into a cell; a leading "=" makes Google Sheets run it as a formula
+  // (=IMAGE/=HYPERLINK exfiltration), so "=" first is refused. Real answers are letters or numbers;
+  // negative numbers ("-5") stay valid because only "=" triggers a formula in Google Sheets.
   return /^[0-9a-f]{16}$/.test(r.id) && /^[0-9a-f]{16}$/.test(r.install) &&
     (r.deck === "stats" || r.deck === "research" || r.deck === "theory") && typeof r.card === "string" && /^[\w-]{1,40}$/.test(r.card) &&
     typeof r.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.day) && bit(r.right) && bit(r.sure) &&
     typeof r.score === "number" && r.score >= 0 && r.score <= 1 &&
-    typeof r.answer === "string" && r.answer.length <= 40 && bit(r.first) && [1, 2, 3].indexOf(r.level) >= 0;
+    typeof r.answer === "string" && r.answer.length <= 40 && !/^\s*=/.test(r.answer) && bit(r.first) && [1, 2, 3].indexOf(r.level) >= 0;
 }
 
 // The rows of one request worth keeping: valid, and all from the install code of the first one.
@@ -55,9 +63,11 @@ function doPost(e) {
   try { body = JSON.parse(e.postData.contents); } catch (err) { return json({ ok: false, error: "not JSON" }); }
   var good = acceptedRows(body);
   if (!good.length) return json({ ok: false, error: "no valid rows" });
-  var cache = CacheService.getScriptCache(), key = "n-" + good[0].install + "-" + good[0].day;
-  var n = Number(cache.get(key) || 0);
+  var cache = CacheService.getScriptCache();
+  var key = "n-" + good[0].install + "-" + good[0].day, gkey = "g-" + good[0].day;
+  var n = Number(cache.get(key) || 0), g = Number(cache.get(gkey) || 0);
   if (n + good.length > DAILY_CAP) return json({ ok: false, error: "daily cap" });
+  if (g + good.length > GLOBAL_CAP) return json({ ok: false, error: "busy" });
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -67,7 +77,8 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
-  cache.put(key, String(n + good.length), 21600);
+  cache.put(key, String(n + good.length), CAP_TTL);
+  cache.put(gkey, String(g + good.length), CAP_TTL);
   return json({ ok: true, saved: good.length });
 }
 

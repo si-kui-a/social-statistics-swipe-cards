@@ -476,6 +476,20 @@
       (e.length < 4 || (Number.isFinite(e[3]) && e[3] >= 0 && e[3] <= 1)) &&
       (e.length < 5 || (typeof e[4] === "string" && e[4].length <= ANSWER_MAX));
   }
+  // A card made in the app ($("addForm")): strings and a timestamp only, always a flip card. An
+  // imported card may carry nothing else -- format/num/choices/points would route rendering to the
+  // num/mc/essay paths, and a crafted file could then reach an unescaped sink. Fields are capped so a
+  // file cannot bloat localStorage. Whitelist, not blacklist: an unknown key is refused.
+  const MINE_FIELDS = { id: 1, chapter: 1, label: 1, q: 1, a: 1, created: 1, group: 1, ch: 1 };
+  function validMineCard(m) {
+    if (!m || typeof m !== "object" || Array.isArray(m)) return false;
+    if (!Object.keys(m).every(k => MINE_FIELDS[k])) return false;
+    const str = (x, max) => typeof x === "string" && x.length <= max;
+    return str(m.id, 60) && str(m.q, 2000) && str(m.a, 2000) &&
+      (m.chapter === undefined || str(m.chapter, 200)) && (m.label === undefined || str(m.label, 200)) &&
+      (m.group === undefined || str(m.group, 200)) && (m.created === undefined || Number.isFinite(m.created)) &&
+      (m.ch === undefined || Number.isFinite(m.ch));
+  }
   // One attempt as saved: [time, correct, sure], then the score when it is partial or an answer
   // follows, then the answer (mc letter or typed number, trimmed; essays and flips keep their text
   // elsewhere, so they carry none).
@@ -497,7 +511,7 @@
     const bad = Object.entries(data.progress).filter(([, p]) =>
       !p || !Number.isInteger(p.box) || !Number.isFinite(p.due) || !Array.isArray(p.log) || !p.log.every(validAttempt));
     if (bad.length) errs.push(`${bad.length} 張卡的作答紀錄格式不正確（例如 ${bad[0][0]}）`);
-    if (data.mine !== undefined && !Array.isArray(data.mine)) errs.push("自製卡格式不正確");
+    if (data.mine !== undefined && (!Array.isArray(data.mine) || !data.mine.every(validMineCard))) errs.push("自製卡格式不正確");
     if (data.essays !== undefined && (typeof data.essays !== "object" || !Object.values(data.essays).every(Array.isArray))) errs.push("申論作答格式不正確");
     if (data.model !== undefined && (typeof data.model !== "object" || !Object.values(data.model.theta || {}).every(Number.isFinite))) errs.push("能力估計格式不正確");
     return errs;

