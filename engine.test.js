@@ -192,6 +192,19 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
                                                          { name: "是非", n: 5, formats: ["truefalse"], pending: true }] }, () => 0);
   ok("exam: spread across chapters", new Set(sp.ids.map(id => many.find(c => c.id === id).chapter)).size === 3);
   ok("exam: pending section named", sp.short.join() === "是非（題庫建置中）");
+  // adaptive: level climbs only after a sitting at EXAM_RAISE or better, right cards sit out EXAM_SKIP sittings
+  ok("exam: starts at 基礎", E.examLevel([]) === 1);
+  ok("exam: climbs on a pass, holds on a fail, caps at 進階",
+     E.examLevel([{ n: 10, ok: 6 }]) === 2 && E.examLevel([{ n: 10, ok: 5 }]) === 1 && E.examLevel(Array(5).fill({ n: 10, ok: 9 })) === 3);
+  const lv = [1, 1, 2, 2, 3, 3].map((level, i) => ({ id: `l${i}`, chapter: "1A", format: "mc", level }));
+  const sec = { sections: [{ name: "選擇", n: 2, formats: ["mc"] }] };
+  ok("exam: first sitting draws 基礎", E.buildExam(lv, sec, Math.random).ids.every(id => id === "l0" || id === "l1"));
+  const hard = E.buildExam(lv, sec, Math.random, [{ n: 2, ok: 2, right: [] }, { n: 2, ok: 2, right: ["l4"] }]);
+  ok("exam: after two passes draws 進階, right ones sit out first", hard.level === 3 && hard.ids[0] === "l5" && hard.ids.includes("l4") === false);
+  const back = E.buildExam(lv.slice(0, 2), sec, Math.random, [{ n: 2, ok: 2, right: ["l0", "l1"] }]);
+  ok("exam: right cards return when nothing fresh is left", back.ids.length === 2);
+  const old = E.buildExam(lv, sec, Math.random, Array(4).fill({ n: 2, ok: 0, right: [] }).concat([{ n: 2, ok: 0, right: [] }]).map((r, i) => i === 0 ? { ...r, right: ["l0"] } : r));
+  ok("exam: a right answer older than EXAM_SKIP sittings may return", old.ids.includes("l0"));
   const s = E.summarize([{ id: 1, section: "選擇", right: true }, { id: 2, section: "選擇", right: false }, { id: 3, section: "計算", right: true }]);
   ok("exam: score by section", s.bySection.map(b => `${b.label}${b.right}/${b.n}`).join() === "選擇1/2,計算1/1");
 }

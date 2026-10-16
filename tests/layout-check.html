@@ -133,7 +133,8 @@
     if (!/錯誤率/.test(D.querySelector("#card").textContent)) failures.push("pause shows no error rate by domain");
     // Mock exam: no right/wrong shown while it runs, written answers graded after hand-in, score by
     // section at the end, and time-up hands the paper in.
-    W.eval("localStorage.clear(); load();");
+    // Saved before mock exams were logged (no examLog): the sitting must still be logged (2026-10-16).
+    W.eval(`localStorage.clear(); localStorage.setItem(D().key, JSON.stringify({ progress: {}, history: [] })); load();`);
     pick(`u => { u.pace = "exam"; u.exam = "mid-mini"; }`);
     seen.push("exam/runs without feedback");
     // 2026-10-14: the hidden scope row shifted the grid and the card collapsed to 2px in every exam.
@@ -151,6 +152,9 @@
     seen.push("exam/score by section");
     if (!W.eval("round.done") || !/大題/.test(D.querySelector("#card").textContent)) failures.push("no exam summary with sections");
     if (!/再考一次/.test(D.getElementById("actions").textContent)) failures.push("exam end offers no 再考一次");
+    seen.push("exam/sitting logged with its level");
+    if (W.eval(`(state.examLog["mid-mini"] || []).length`) !== 1 || !/客觀題難度/.test(D.querySelector("#card").textContent))
+      failures.push("exam sitting not logged or no level shown");
     W.eval(`document.getElementById("again").click()`);
     W.eval("round.exam.ends = Date.now() - 1; examTick()");
     seen.push("exam/time-up hands in");

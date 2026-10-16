@@ -385,20 +385,39 @@
       for (const l of lists) if (i < l.length && out.length < n) out.push(l[i]);
     return out;
   }
-  function buildExam(cards, exam, rnd = Math.random) {
+  // Adaptive mock exams (2026-10-16 request): the objective sections climb a level (基礎 → 標準 → 進階)
+  // after each sitting of the same paper scored at least EXAM_RAISE on them, and stay put otherwise, so
+  // repeated sittings end on the hardest cards; cards answered right in the last EXAM_SKIP sittings are
+  // drawn only when the fresh ones run out. log: that paper's past sittings, oldest first,
+  // { right: [ids answered right], n, ok } over the objective sections. Essays are left as drawn.
+  const EXAM_SKIP = 3, EXAM_RAISE = 0.6;
+  function examLevel(log) {
+    let lvl = 1;
+    for (const r of log || []) if (r.n && r.ok / r.n >= EXAM_RAISE) lvl = Math.min(3, lvl + 1);
+    return lvl;
+  }
+  function buildExam(cards, exam, rnd = Math.random, log = []) {
     const sc = exam.scope || {};
     const under = (c, prefixes) => prefixes.some(p => String(c.chapter).startsWith(p));
     const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters)));
     const used = new Set(), ids = [], section = {}, short = [];
+    const lvl = examLevel(log), skip = new Set(log.slice(-EXAM_SKIP).flatMap(r => r.right || []));
+    const draw = (list, n) => exam.spread ? acrossChapters(list, n) : list.slice(0, n);
     for (const s of exam.sections) {
       const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters)));
       for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
-      const take = exam.spread ? acrossChapters(cand, s.n) : cand.slice(0, s.n);
+      let take;
+      if (s.formats.includes("essay")) take = draw(cand, s.n);
+      else {  // stable sort: still random within a level
+        const near = list => list.sort((a, b) => Math.abs(level(a) - lvl) - Math.abs(level(b) - lvl));
+        take = draw(near(cand.filter(c => !skip.has(c.id))), s.n);
+        if (take.length < s.n) take = take.concat(draw(near(cand.filter(c => skip.has(c.id))), s.n - take.length));
+      }
       for (const c of take) { used.add(c.id); ids.push(c.id); section[c.id] = s.name; }
       // pending: the deck has no card of this format yet (theory 是非 bank), named so instead of as a shortfall
       if (take.length < s.n) short.push(s.pending ? `${s.name}（題庫建置中）` : `${s.name} ${take.length}/${s.n}`);
     }
-    return { ids, section, short };
+    return { ids, section, short, level: lvl };
   }
 
   // Quizlet-style groups: never answered, still learning (box 0-2: due within 3 days), mastered (box 3+).
@@ -545,6 +564,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, EXAM_SKIP, EXAM_RAISE, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
