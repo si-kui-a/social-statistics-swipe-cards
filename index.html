@@ -720,7 +720,7 @@ function render() {
   let result = "";
   if (phase === "result") {
     const ok = Engine.passed(c, lastScore);
-    const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${c.num.value}${c.num.unit || ""}）` : "";
+    const detail = f === "essay" ? `（寫到 ${Math.round(lastScore * 100)}% 的要點）` : f === "num" ? `（正解 ${esc(c.num.value)}${esc(c.num.unit || "")}）` : "";
     result = `<p class="result ${ok ? "ok" : "bad"}">${ok ? "答對" : "答錯"}${detail}</p>`;
   }
   const mine = phase !== "front" && typed.trim() && f !== "mc"
