@@ -257,7 +257,8 @@
       }
       for (const ex of W.eval("exams")) {
         seen.push(`exam/${deckName} ${ex.id} fills`);
-        const b = W.Engine.buildExam(W.eval("allCards()"), ex);
+        // a pending section (no card of its format yet, e.g. theory 是非) is announced, not a failure
+        const b = W.Engine.buildExam(W.eval("allCards()"), { ...ex, sections: ex.sections.filter(s => !s.pending) });
         if (b.short.length) failures.push(`${deckName} ${ex.id}: sections short ${b.short.join("、")}`);
       }
     }

@@ -186,6 +186,12 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("exam: shortfall reported", ex.short.join() === "計算 1/2");
   const byPrefix = E.buildExam(pool, { scope: { chapters: ["4T"] }, sections: [{ name: "判讀", n: 3, formats: ["num"] }] }, () => 0);
   ok("exam: chapter-code scope", byPrefix.ids.join() === "x1");
+  // spread: one per chapter before any chapter gives a second; pending sections say so instead of n/m
+  const many = ["2M1", "2M1", "2M1", "2M2", "2M3"].map((chapter, i) => ({ id: `s${i}`, chapter, format: "mc" }));
+  const sp = E.buildExam(many, { spread: true, sections: [{ name: "選擇", n: 3, formats: ["mc"] },
+                                                         { name: "是非", n: 5, formats: ["truefalse"], pending: true }] }, () => 0);
+  ok("exam: spread across chapters", new Set(sp.ids.map(id => many.find(c => c.id === id).chapter)).size === 3);
+  ok("exam: pending section named", sp.short.join() === "是非（題庫建置中）");
   const s = E.summarize([{ id: 1, section: "選擇", right: true }, { id: 2, section: "選擇", right: false }, { id: 3, section: "計算", right: true }]);
   ok("exam: score by section", s.bySection.map(b => `${b.label}${b.right}/${b.n}`).join() === "選擇1/2,計算1/1");
 }

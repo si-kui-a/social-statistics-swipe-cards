@@ -375,6 +375,16 @@
   // A mock exam from its spec in the deck file (exams[]): scope by course chapter (ch) or chapter-code
   // prefixes (chapters), then each section's n cards of the given formats, in section order as on a real
   // paper. Returns ids, each id's section, and the sections that came up short (too few cards yet).
+  // Round-robin over chapters in the order the shuffled cards first name them, so a section draws from as
+  // many chapters as it has questions (theory 模擬考辦法: 每份跨多章，不集中一章).
+  function acrossChapters(shuffled, n) {
+    const by = new Map();
+    for (const c of shuffled) { if (!by.has(c.chapter)) by.set(c.chapter, []); by.get(c.chapter).push(c); }
+    const lists = [...by.values()], out = [];
+    for (let i = 0; out.length < n && lists.some(l => i < l.length); i++)
+      for (const l of lists) if (i < l.length && out.length < n) out.push(l[i]);
+    return out;
+  }
   function buildExam(cards, exam, rnd = Math.random) {
     const sc = exam.scope || {};
     const under = (c, prefixes) => prefixes.some(p => String(c.chapter).startsWith(p));
@@ -383,9 +393,10 @@
     for (const s of exam.sections) {
       const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters)));
       for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
-      const take = cand.slice(0, s.n);
+      const take = exam.spread ? acrossChapters(cand, s.n) : cand.slice(0, s.n);
       for (const c of take) { used.add(c.id); ids.push(c.id); section[c.id] = s.name; }
-      if (take.length < s.n) short.push(`${s.name} ${take.length}/${s.n}`);
+      // pending: the deck has no card of this format yet (theory 是非 bank), named so instead of as a shortfall
+      if (take.length < s.n) short.push(s.pending ? `${s.name}（題庫建置中）` : `${s.name} ${take.length}/${s.n}`);
     }
     return { ids, section, short };
   }
