@@ -432,7 +432,7 @@ function newRound(opts = {}) {
   if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
   else if (pace === "exam") {
     const spec = exams.find(e => e.id === ui().exam) || exams[0];
-    const b = spec ? Engine.buildExam(allCards(), spec, Math.random, state.examLog[spec.id] || []) : { ids: [], section: {}, short: [] };
+    const b = spec ? Engine.buildExam(allCards(), spec, Math.random, state.examLog[spec.id] || [], state.progress) : { ids: [], section: {}, short: [] };
     list = b.ids.map(byId).filter(Boolean);
     if (spec) {
       label = spec.title;
@@ -626,19 +626,28 @@ function pauseHtml(r) {
 /// The level this sitting drew its objective cards at and the next one (logExam has already run).
 function examLevelNote(r) {
   const now = Engine.LEVEL_NAME[r.exam.level], next = Engine.LEVEL_NAME[Engine.examLevel(state.examLog[r.exam.id])];
-  return `客觀題難度：${now}・下一輪：${next}（客觀題答對 ${Math.round(Engine.EXAM_RAISE * 100)}% 以上升一級；答對的題目近 ${Engine.EXAM_SKIP} 輪不再出）`;
+  return `客觀題難度：${now}・下一輪：${next}（${Engine.EXAM_PASS} 分及格升一級、未滿 ${Engine.EXAM_DROP} 分降一級；答對的題目近 ${Engine.EXAM_SKIP} 輪不再出）`;
+}
+/// One decimal like a 國考 score sheet, without a trailing .0
+function fmtPts(x) { return String(Math.round(x * 10) / 10); }
+// 國考-style points of a sitting, from the paper spec as exported (配分 per section, else equal per question).
+function examPoints(r) {
+  const spec = exams.find(e => e.id === r.exam.id) || { sections: [] };
+  return Engine.examScore(spec, r.exam.section, r.results);
 }
 // A finished mock exam: score, score by section, time used, what the paper could not fill yet.
 function examSummaryHtml(r) {
   const s = Engine.summarize(r.results), ex = r.exam;
   const used = Math.min(ex.minutes, Math.ceil(((r.ended || Date.now()) - r.started) / 60000));
-  const rows = s.bySection.map(b => `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${Math.round(100 * b.right / b.n)}%</td></tr>`).join("");
+  const pts = examPoints(r), got = new Map(pts.bySection.map(b => [b.label, b]));
+  const rows = s.bySection.map(b => { const p = got.get(b.label) || { got: 0, worth: 0 };
+    return `<tr><td>${esc(b.label)}</td><td class="n">${b.right}/${b.n}</td><td class="n">${fmtPts(p.got)} / ${fmtPts(p.worth)}</td></tr>`; }).join("");
   const unanswered = r.total - s.n;
   return `<div class="meta"><span>模擬考結束</span><span>${esc(ex.title)}</span></div>
-    <div class="score">${s.right} / ${r.total}　<span class="result ${s.right / Math.max(1, r.total) >= 0.6 ? "ok" : "bad"}">${Math.round(100 * s.right / Math.max(1, r.total))} 分</span></div>
+    <div class="score">${s.right} / ${r.total} 題　<span class="result ${pts.pass ? "ok" : "bad"}">${fmtPts(pts.total)} 分・${pts.pass ? "及格" : "不及格"}</span></div>
     <p class="small">用了 ${used} / ${ex.minutes} 分鐘${ex.timeUp ? "（時間到自動交卷）" : ""}${unanswered ? `・未作答 ${unanswered} 題` : ""}</p>
     ${ex.level ? `<p class="small">${examLevelNote(r)}</p>` : ""}
-    ${rows ? `<table class="t"><tr><th>大題</th><th class="n">答對</th><th class="n">得分</th></tr>${rows}</table>` : ""}
+    ${rows ? `<table class="t"><tr><th>大題</th><th class="n">答對</th><th class="n">得分／配分</th></tr>${rows}</table>` : ""}
     ${analysisHtml(r)}
     ${ex.short.length ? `<p class="small">題目還不夠的大題：${esc(ex.short.join("、"))}（講義與題庫補齊後會自動加入）</p>` : ""}
     ${ex.note ? `<p class="hint">${esc(ex.note)}</p>` : ""}`;
@@ -815,11 +824,11 @@ function finishRound() {
 }
 
 // One sitting of a mock exam for Engine.buildExam: the objective cards answered right drop out of the next
-// sittings and the share right sets the next level. Unanswered cards count as wrong; essays are left out.
+// sittings and the 國考-style score (essays included, unanswered 0) sets the next level.
 function logExam(r) {
   const obj = r.ids.filter(id => { const c = byId(id); return c && format(c) !== "essay"; });
   const right = r.results.filter(x => x.right && obj.includes(x.id)).map(x => x.id);
-  const log = [...(state.examLog[r.exam.id] || []), { t: r.ended, n: obj.length, ok: right.length, right }];
+  const log = [...(state.examLog[r.exam.id] || []), { t: r.ended, score: Math.round(examPoints(r).total), right }];
   state.examLog[r.exam.id] = log.slice(-KEEP_EXAM_LOG);
 }
 
@@ -885,7 +894,7 @@ function record(score) {
   Engine.updateAbility(state.model, c, score);
   if (round && !round.results.some(r => r.id === c.id)) {
     const given = f === "mc" ? picked : f === "num" ? typed : "";
-    round.results.push({ id: c.id, label: c.label || c.chapter, type: c.type || KIND[c.kind] || "", right, sure,
+    round.results.push({ id: c.id, label: c.label || c.chapter, type: c.type || KIND[c.kind] || "", right, sure, score,
                          section: round.exam ? round.exam.section[c.id] : undefined,
                          diag: Engine.diagnose({ ...c, format: f }, given, right, sure),
                          trap: !right && f === "mc" && c.traps ? c.traps[picked] || null : null });

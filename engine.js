@@ -385,18 +385,52 @@
       for (const l of lists) if (i < l.length && out.length < n) out.push(l[i]);
     return out;
   }
-  // Adaptive mock exams (2026-10-16 request): the objective sections climb a level (基礎 → 標準 → 進階)
-  // after each sitting of the same paper scored at least EXAM_RAISE on them, and stay put otherwise, so
-  // repeated sittings end on the hardest cards; cards answered right in the last EXAM_SKIP sittings are
-  // drawn only when the fresh ones run out. log: that paper's past sittings, oldest first,
-  // { right: [ids answered right], n, ok } over the objective sections. Essays are left as drawn.
-  const EXAM_SKIP = 3, EXAM_RAISE = 0.6;
+  // Adaptive mock exams (2026-10-16 requests, then "比照國考評分"): the objective sections start at 基礎 and
+  // move a level per sitting of the same paper by its 國考-style score (examScore): 及格 (60) or better
+  // climbs, under EXAM_DROP falls back, in between holds. Cards answered right in the last EXAM_SKIP
+  // sittings are drawn only when the fresh ones run out. log: that paper's past sittings, oldest first,
+  // { right: [ids answered right], score: 0-100 } (sittings logged before scoring: { n, ok } instead).
+  const EXAM_SKIP = 3, EXAM_PASS = 60, EXAM_DROP = 50;
   function examLevel(log) {
     let lvl = 1;
-    for (const r of log || []) if (r.n && r.ok / r.n >= EXAM_RAISE) lvl = Math.min(3, lvl + 1);
+    for (const r of log || []) {
+      const s = Number.isFinite(r.score) ? r.score : r.n ? 100 * r.ok / r.n : null;
+      if (s === null) continue;
+      lvl = s >= EXAM_PASS ? Math.min(3, lvl + 1) : s < EXAM_DROP ? Math.max(1, lvl - 1) : lvl;
+    }
     return lvl;
   }
-  function buildExam(cards, exam, rnd = Math.random, log = []) {
+  // Classical item analysis on the learner's own attempts: with at least MIN_SAMPLE of them, a pass rate
+  // (難度指數 P) above P_EASY reads the card one level easier than its label, below P_HARD one harder
+  // (the usual .25-.75 band for a well-pitched item). Discrimination needs many examinees, so it is not used.
+  const P_EASY = 0.75, P_HARD = 0.25;
+  function effectiveLevel(card, progress) {
+    const lv = level(card), log = ((progress || {})[card.id] || {}).log || [];
+    if (log.length < MIN_SAMPLE) return lv;
+    const p = log.filter(a => a[1]).length / log.length;
+    return p > P_EASY ? Math.max(1, lv - 1) : p < P_HARD ? Math.min(3, lv + 1) : lv;
+  }
+  // 國考-style score out of 100: each section is worth its points (default: every question the same), each
+  // question points/n times its graded score (partial for essays), unanswered 0. Sections the deck could not
+  // fill at all (pending) are left out and the rest scaled to 100. Returns the total and per-section points.
+  function examScore(exam, section, results) {
+    const drawn = new Map();
+    for (const name of Object.values(section)) drawn.set(name, (drawn.get(name) || 0) + 1);
+    const secs = exam.sections.filter(s => drawn.has(s.name));
+    // n = questions actually drawn: a section the deck only partly fills is not marked down for the gap
+    const n = s => drawn.get(s.name), qs = secs.reduce((a, s) => a + n(s), 0);
+    const raw = s => Number.isFinite(s.points) ? s.points : 100 * n(s) / Math.max(1, qs);
+    const scale = 100 / Math.max(1e-9, secs.reduce((a, s) => a + raw(s), 0));
+    const by = secs.map(s => {
+      const worth = raw(s) * scale, each = worth / n(s);
+      const got = results.filter(r => r.section === s.name)
+        .reduce((a, r) => a + each * (Number.isFinite(r.score) ? r.score : r.right ? 1 : 0), 0);
+      return { label: s.name, worth, got };
+    });
+    const total = by.reduce((a, b) => a + b.got, 0);
+    return { total, pass: total >= EXAM_PASS - 1e-9, bySection: by };
+  }
+  function buildExam(cards, exam, rnd = Math.random, log = [], progress = {}) {
     const sc = exam.scope || {};
     const under = (c, prefixes) => prefixes.some(p => String(c.chapter).startsWith(p));
     const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters)));
@@ -409,7 +443,8 @@
       let take;
       if (s.formats.includes("essay")) take = draw(cand, s.n);
       else {  // stable sort: still random within a level
-        const near = list => list.sort((a, b) => Math.abs(level(a) - lvl) - Math.abs(level(b) - lvl));
+        const gap = c => Math.abs(effectiveLevel(c, progress) - lvl);
+        const near = list => list.sort((a, b) => gap(a) - gap(b));
         take = draw(near(cand.filter(c => !skip.has(c.id))), s.n);
         if (take.length < s.n) take = take.concat(draw(near(cand.filter(c => skip.has(c.id))), s.n - take.length));
       }
@@ -564,6 +599,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, EXAM_SKIP, EXAM_RAISE, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

@@ -155,6 +155,9 @@
     seen.push("exam/sitting logged with its level");
     if (W.eval(`(state.examLog["mid-mini"] || []).length`) !== 1 || !/客觀題難度/.test(D.querySelector("#card").textContent))
       failures.push("exam sitting not logged or no level shown");
+    seen.push("exam/國考 score out of 100");
+    if (!Number.isFinite(W.eval(`state.examLog["mid-mini"][0].score`)) || !/分・(不)?及格/.test(D.querySelector("#card").textContent))
+      failures.push("no 國考-style score on the sitting or its summary");
     W.eval(`document.getElementById("again").click()`);
     W.eval("round.exam.ends = Date.now() - 1; examTick()");
     seen.push("exam/time-up hands in");
