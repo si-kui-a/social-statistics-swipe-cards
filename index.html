@@ -312,7 +312,7 @@ const DECKS = {
   theory: { title: "社會學理論", file: "cards-theory.json", key: "swipe-cards-theory-v1", newStart: 15 },
 };
 const DECK_KEY = "swipe-cards-deck";
-const KEEP_ROUNDS = 12, KEEP_HISTORY = 60;
+const KEEP_ROUNDS = 12, KEEP_HISTORY = 60, KEEP_EXAM_LOG = 10;
 
 let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], current = null;
 // The round being played. Each selection (pace + scope + group + chapters) keeps its own round in
@@ -344,7 +344,7 @@ let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 
-function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [] }; }
+function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [], examLog: {} }; }
 function load() {
   state = blank();
   try {
@@ -432,12 +432,12 @@ function newRound(opts = {}) {
   if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
   else if (pace === "exam") {
     const spec = exams.find(e => e.id === ui().exam) || exams[0];
-    const b = spec ? Engine.buildExam(allCards(), spec) : { ids: [], section: {}, short: [] };
+    const b = spec ? Engine.buildExam(allCards(), spec, Math.random, state.examLog[spec.id] || []) : { ids: [], section: {}, short: [] };
     list = b.ids.map(byId).filter(Boolean);
     if (spec) {
       label = spec.title;
       exam = { id: spec.id, title: spec.title, minutes: spec.minutes, ends: now + spec.minutes * 60000, section: b.section,
-               short: b.short, note: spec.note || "", pending: [], grading: false, timeUp: false };
+               short: b.short, level: b.level, note: spec.note || "", pending: [], grading: false, timeUp: false };
     }
   }
   else if (pace === "all") list = Engine.fullPass(cards, state, { now });
@@ -623,6 +623,11 @@ function pauseHtml(r) {
     <p class="hint">分開幾天練，比一次做很多張記得久；答錯很多時，先弄懂上面的問題再繼續。</p>`;
 }
 
+/// The level this sitting drew its objective cards at and the next one (logExam has already run).
+function examLevelNote(r) {
+  const now = Engine.LEVEL_NAME[r.exam.level], next = Engine.LEVEL_NAME[Engine.examLevel(state.examLog[r.exam.id])];
+  return `客觀題難度：${now}・下一輪：${next}（客觀題答對 ${Math.round(Engine.EXAM_RAISE * 100)}% 以上升一級；答對的題目近 ${Engine.EXAM_SKIP} 輪不再出）`;
+}
 // A finished mock exam: score, score by section, time used, what the paper could not fill yet.
 function examSummaryHtml(r) {
   const s = Engine.summarize(r.results), ex = r.exam;
@@ -632,6 +637,7 @@ function examSummaryHtml(r) {
   return `<div class="meta"><span>模擬考結束</span><span>${esc(ex.title)}</span></div>
     <div class="score">${s.right} / ${r.total}　<span class="result ${s.right / Math.max(1, r.total) >= 0.6 ? "ok" : "bad"}">${Math.round(100 * s.right / Math.max(1, r.total))} 分</span></div>
     <p class="small">用了 ${used} / ${ex.minutes} 分鐘${ex.timeUp ? "（時間到自動交卷）" : ""}${unanswered ? `・未作答 ${unanswered} 題` : ""}</p>
+    ${ex.level ? `<p class="small">${examLevelNote(r)}</p>` : ""}
     ${rows ? `<table class="t"><tr><th>大題</th><th class="n">答對</th><th class="n">得分</th></tr>${rows}</table>` : ""}
     ${analysisHtml(r)}
     ${ex.short.length ? `<p class="small">題目還不夠的大題：${esc(ex.short.join("、"))}（講義與題庫補齊後會自動加入）</p>` : ""}
@@ -805,6 +811,16 @@ function finishRound() {
   const st = examStatus(), tier = st && st.p.tier;
   state.history = [...state.history, { t: Date.now(), label: round.label, pace: round.pace, retry: round.retry, exam: !!round.exam, n: s.n, right: s.right,
                                         sureWrong: s.sureWrong.length, ...(tier ? { tier } : {}) }].slice(-KEEP_HISTORY);
+  if (round.exam) logExam(round);
+}
+
+// One sitting of a mock exam for Engine.buildExam: the objective cards answered right drop out of the next
+// sittings and the share right sets the next level. Unanswered cards count as wrong; essays are left out.
+function logExam(r) {
+  const obj = r.ids.filter(id => { const c = byId(id); return c && format(c) !== "essay"; });
+  const right = r.results.filter(x => x.right && obj.includes(x.id)).map(x => x.id);
+  const log = [...(state.examLog[r.exam.id] || []), { t: r.ended, n: obj.length, ok: right.length, right }];
+  state.examLog[r.exam.id] = log.slice(-KEEP_EXAM_LOG);
 }
 
 // What the learner already chose to go past today (Engine.pauseReason's ack); a new day starts clean.
