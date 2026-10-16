@@ -194,8 +194,30 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("exam: pending section named", sp.short.join() === "是非（題庫建置中）");
   // adaptive: level climbs only after a sitting at EXAM_RAISE or better, right cards sit out EXAM_SKIP sittings
   ok("exam: starts at 基礎", E.examLevel([]) === 1);
-  ok("exam: climbs on a pass, holds on a fail, caps at 進階",
-     E.examLevel([{ n: 10, ok: 6 }]) === 2 && E.examLevel([{ n: 10, ok: 5 }]) === 1 && E.examLevel(Array(5).fill({ n: 10, ok: 9 })) === 3);
+  ok("exam: 及格 climbs, 50-59 holds, under 50 drops, stays within 基礎-進階",
+     E.examLevel([{ score: 60 }]) === 2 && E.examLevel([{ score: 60 }, { score: 55 }]) === 2 &&
+     E.examLevel([{ score: 60 }, { score: 49 }]) === 1 && E.examLevel([{ score: 10 }]) === 1 &&
+     E.examLevel(Array(5).fill({ score: 90 })) === 3);
+  ok("exam: sittings logged before scoring still count", E.examLevel([{ n: 10, ok: 6 }]) === 2);
+  // 國考 score: equal points per question by default, essays partial, a pending (undrawn) section left out
+  const paper = { sections: [{ name: "選擇", n: 2, formats: ["mc"] }, { name: "是非", n: 5, formats: ["truefalse"], pending: true },
+                            { name: "申論", n: 2, formats: ["essay"] }] };
+  const secOf = { a: "選擇", b: "選擇", c: "申論", d: "申論" };
+  const sc = E.examScore(paper, secOf, [{ section: "選擇", right: true, score: 1 }, { section: "選擇", right: false, score: 0 },
+                                       { section: "申論", right: true, score: 0.6 }]);
+  ok("exam: 國考 score out of 100 with partial essays", Math.abs(sc.total - 40) < 1e-9 && !sc.pass && sc.bySection.length === 2);
+  const weighted = E.examScore({ sections: [{ name: "選擇", n: 2, points: 20, formats: ["mc"] }, { name: "申論", n: 2, points: 80, formats: ["essay"] }] },
+                               secOf, [{ section: "申論", score: 1 }, { section: "申論", score: 0.5 }]);
+  ok("exam: section 配分 respected", Math.abs(weighted.total - 60) < 1e-9 && weighted.pass);
+  const part = E.examScore({ sections: [{ name: "選擇", n: 5, formats: ["mc"] }] }, { a: "選擇", b: "選擇" },
+                           [{ section: "選擇", score: 1 }, { section: "選擇", score: 1 }]);
+  ok("exam: a section the deck only partly fills is not marked down", Math.abs(part.total - 100) < 1e-9);
+  // item analysis: own pass rate moves a card's level once there are enough attempts
+  const tries = bits => ({ log: bits.map((b, i) => [i, b]) });
+  const card2 = { id: "k", level: 2 };
+  ok("exam: P above .75 reads easier, below .25 harder, too few attempts keep the label",
+     E.effectiveLevel(card2, { k: tries([1, 1, 1, 1]) }) === 1 && E.effectiveLevel(card2, { k: tries([0, 0, 0, 0]) }) === 3 &&
+     E.effectiveLevel(card2, { k: tries([1, 1]) }) === 2 && E.effectiveLevel(card2, { k: tries([1, 0, 1, 0]) }) === 2);
   const lv = [1, 1, 2, 2, 3, 3].map((level, i) => ({ id: `l${i}`, chapter: "1A", format: "mc", level }));
   const sec = { sections: [{ name: "選擇", n: 2, formats: ["mc"] }] };
   ok("exam: first sitting draws 基礎", E.buildExam(lv, sec, Math.random).ids.every(id => id === "l0" || id === "l1"));
