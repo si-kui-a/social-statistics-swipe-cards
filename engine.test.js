@@ -345,5 +345,21 @@ ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache
   }
 }
 
+// growth: one point per local day; first attempt per card that day; known/seen carry over
+{
+  const at = (d, h) => new Date(2026, 9, d, h).getTime();
+  const g = E.growth({
+    a: { log: [[at(14, 9), 0, 0], [at(14, 10), 1, 0], [at(16, 9), 1, 1]] },
+    b: { log: [[at(14, 11), 1, 1, 1, "B"]] },
+    c: { log: [[at(16, 10), 0, 0]] },
+    d: { log: [] },
+  });
+  ok("growth: a point per day with attempts", g.length === 2 && g[0].day === "2026-10-14" && g[1].day === "2026-10-16");
+  ok("growth: same-day retry does not lift the rate", g[0].n === 2 && g[0].right === 1 && g[0].pct === 50);
+  ok("growth: known uses the latest answer by day's end", g[0].known === 2 && g[0].seen === 2);
+  ok("growth: earlier cards carry over to later days", g[1].n === 2 && g[1].known === 2 && g[1].seen === 3);
+  ok("growth: no attempts, no points", E.growth({}).length === 0);
+}
+
 console.log(`${fails} failed`);
 process.exit(fails ? 1 : 0);
