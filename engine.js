@@ -60,8 +60,11 @@
     }
     return false;
   }
+  // A keyword already in the question is no evidence: restating the question used to pre-tick 45% of
+  // the statistics rubric points and pass 35 of 89 essays.
   function matchPoints(card, text) {
-    return (card.points || []).map(p => (p.kw || []).some(k => keywordHit(text, k)));
+    const q = normalize(card.q || "");
+    return (card.points || []).map(p => (p.kw || []).some(k => !q.includes(normalize(k)) && keywordHit(text, k)));
   }
 
   function parseNumber(input) {

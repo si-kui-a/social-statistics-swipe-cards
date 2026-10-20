@@ -36,6 +36,9 @@ ok("keyword hit", E.matchPoints(essay, "採用隨機抽樣以確保代表性").j
 ok("negated keyword not hit", E.matchPoints(essay, "這不是隨機抽樣").join() === "false,false");
 ok("非常 is not a negation", E.keywordHit("非常有代表性", "代表性"));
 ok("case and width ignored", E.keywordHit("Simple RANDOM sample", "random"));
+ok("keyword from the question is not evidence",
+   E.matchPoints({ ...essay, q: "何謂隨機抽樣？" }, "隨機抽樣以確保代表性").join() === "false,true" &&
+   E.matchPoints({ ...essay, q: "何謂隨機抽樣？" }, "random sample").join() === "true,false");
 ok("essay score is the ticked share", E.grade(essay, [true, false]) === 0.5);
 ok("essay passes at 0.6 by default", !E.passed(essay, 0.5) && E.passed(essay, 1));
 
