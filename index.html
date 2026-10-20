@@ -149,6 +149,17 @@ button.back { font: inherit; font-weight: 700; color: var(--accent); background:
 table.t { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
 table.t th, table.t td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
 table.t td.n, table.t th.n { text-align: right; }
+.growth svg { display: block; width: 100%; height: auto; overflow: visible; font: .62rem var(--font-body); }
+.growth .grid { stroke: var(--line); stroke-width: 1; }
+.growth .ax { fill: var(--muted); }
+.growth .val { fill: var(--ink); font-weight: 600; }
+.growth .s1 { stroke: var(--accent); fill: none; stroke-width: 2; stroke-linejoin: round; }
+.growth .s2 { stroke: var(--muted); fill: none; stroke-width: 2; stroke-dasharray: 4 3; }
+.growth .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.growth .hit { fill: transparent; cursor: pointer; }
+.growth .hit.on { fill: var(--tag); }
+.growth .key { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--accent); vertical-align: middle; margin: 0 3px 0 8px; }
+.growth .key.s2 { border-top: 2px dashed var(--muted); }
 .choices { display: grid; gap: 8px; }
 .choice { font: inherit; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--paper); color: var(--ink); cursor: pointer; }
@@ -1062,11 +1073,61 @@ function renderScores() {
     const m = Engine.mastery(allCards().filter(c => c.chapter === k), state.progress);
     return `<tr><td>${esc(l.split("｜").pop())}</td><td class="n">${m.mastered}</td><td class="n">${m.learning}</td><td class="n">${m.unseen}</td></tr>`;
   }).join("");
-  $("scores").innerHTML = `${now}
+  $("scores").innerHTML = `${now}${renderGrowth()}
     <table class="t"><tr><th>完成時間</th><th>範圍</th><th class="n">答對</th><th class="n">得分</th></tr>${hist || `<tr><td colspan="4">還沒有完成的一輪</td></tr>`}</table>
     <p class="small">各章熟練度（熟練＝連續答對、間隔已到 7 天以上）</p>
     <table class="t"><tr><th>章節</th><th class="n">熟練</th><th class="n">學習中</th><th class="n">未做</th></tr>${mast}</table>`;
 }
+
+// Growth curve from the card logs (Engine.growth): two charts, not one with two y-scales, since a rate
+// and a card count don't share an axis. x is calendar days, so a gap in practice shows as a gap.
+// Tapping a day shows its numbers in the readout line; the table under 每日數字 has all of them.
+let growthPts = [];
+function renderGrowth() {
+  const g = growthPts = Engine.growth(state.progress);
+  if (g.length < 2) return `<p class="small">成長曲線：至少要有兩天的作答才畫得出來${g.length ? `（目前只有 ${g[0].day.split("-").slice(1).join("/")} 一天）` : ""}。</p>`;
+  const start = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).getTime(); };
+  const span = Math.max(1, Math.round((start(g[g.length - 1].day) - start(g[0].day)) / Engine.DAY));
+  const W = 320, H = 110, L = 30, R = 30, T = 8, B = 18;
+  const x = p => L + (W - L - R) * Math.round((start(p.day) - start(g[0].day)) / Engine.DAY) / span;
+  const md = p => p.day.split("-").slice(1).join("/");
+  function chart(series, max, ticks, fmt) {
+    const y = v => T + (H - T - B) * (1 - v / max);
+    const grid = ticks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`).join("");
+    const days = [g[0], g[g.length - 1]].map((p, i) => `<text class="ax" x="${x(p)}" y="${H - 4}" text-anchor="${i ? "end" : "start"}">${md(p)}</text>`).join("");
+    const lines = series.map(s => {
+      const pts = g.map(p => `${x(p)},${y(p[s.key])}`).join(" "), end = g[g.length - 1];
+      const dots = s.dots ? g.map(p => `<circle class="dot" cx="${x(p)}" cy="${y(p[s.key])}" r="4"/>`).join("") : "";
+      return `<polyline class="${s.cls}" points="${pts}"/>${dots}<text class="val" x="${x(end) + 6}" y="${y(end[s.key]) + 3}">${fmt(end[s.key])}</text>`;
+    }).join("");
+    const step = (W - L - R) / span;
+    const hits = g.map((p, i) => `<rect class="hit" data-g="${i}" x="${x(p) - Math.max(step, 16) / 2}" y="${T}" width="${Math.max(step, 16)}" height="${H - T - B}"/>`).join("");
+    return `<svg viewBox="0 0 ${W} ${H}" role="img">${grid}${hits}${lines}${days}</svg>`;
+  }
+  const top = Math.max(10, Math.ceil(Math.max(...g.map(p => p.seen)) / 10) * 10);
+  const rows = g.slice().reverse().map(p => `<tr><td>${md(p)}</td><td class="n">${p.right}/${p.n}</td><td class="n">${p.pct}%</td><td class="n">${p.known}/${p.seen}</td></tr>`).join("");
+  return `<div class="growth stack">
+    <p class="small">成長曲線：每天第一次作答的答對率（同一天重做不算）</p>
+    ${chart([{ key: "pct", cls: "s1", dots: true }], 100, [0, 50, 100], v => `${v}%`)}
+    <p class="small">答得出來的卡（最近一次答對）<span class="key"></span>答得出來<span class="key s2"></span>做過</p>
+    ${chart([{ key: "seen", cls: "s2" }, { key: "known", cls: "s1", dots: true }], top, [0, top / 2, top], v => `${v}`)}
+    <p class="small" id="growthRead">${growthText(g.length - 1)}</p>
+    <details><summary class="small">每日數字</summary>
+      <table class="t"><tr><th>日期</th><th class="n">第一次答對</th><th class="n">答對率</th><th class="n">答得出來／做過</th></tr>${rows}</table></details>
+  </div>`;
+}
+function growthText(i) {
+  const p = growthPts[i]; if (!p) return "";
+  return `${p.day.split("-").slice(1).join("/")}：做了 ${p.n} 張，第一次就答對 ${p.right} 張（${p.pct}%）；到這天為止答得出來 ${p.known} 張，做過 ${p.seen} 張。點圖上的日期看當天。`;
+}
+function pickGrowth(e) {
+  const r = e.target.closest("[data-g]"); if (!r) return;
+  document.querySelectorAll(".growth .hit.on").forEach(h => h.classList.remove("on"));
+  document.querySelectorAll(`.growth .hit[data-g="${r.dataset.g}"]`).forEach(h => h.classList.add("on"));
+  $("growthRead").textContent = growthText(Number(r.dataset.g));
+}
+$("scores").addEventListener("click", pickGrowth);
+$("scores").addEventListener("pointerover", pickGrowth);
 $("openMenu").addEventListener("click", () => {
   renderScores(); $("dailyMax").value = ui().dailyMax; renderShare();
   $("menuTitle").textContent = `${D().title}・選單`; $("menu").showModal();

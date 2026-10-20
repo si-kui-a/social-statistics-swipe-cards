@@ -330,6 +330,37 @@
   // A mechanical stop (Anki's daily limit, plus a fatigue check): the daily card limit, or the last
   // RECENT_TODAY attempts under half right. ack remembers what the learner already chose to go past:
   // { day, limit, at } with at = the attempt count when the low-accuracy pause was last shown.
+  // Growth over the whole deck, one point per local day with any attempt. pct uses each card's first
+  // attempt that day, as since() does, so retries of a missed card don't lift the day. known: cards
+  // whose latest answer by the end of that day was right; seen: cards answered at least once by then.
+  // Read from the card logs, not state.history, which only has rounds finished since it was added.
+  function growth(progress) {
+    const key = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+    const entries = [];
+    for (const [id, p] of Object.entries(progress))
+      for (const e of p.log || []) if (Array.isArray(e) && Number.isFinite(e[0])) entries.push([e[0], id, e[1] ? 1 : 0]);
+    entries.sort((a, b) => a[0] - b[0]);
+    const days = [], last = new Map();
+    let day = null;
+    for (const [t, id, right] of entries) {
+      const k = key(t);
+      if (!day || day.key !== k) {
+        if (day) close(day);
+        day = { key: k, t, first: new Map() };
+        days.push(day);
+      }
+      if (!day.first.has(id)) day.first.set(id, right);
+      last.set(id, right);
+    }
+    if (day) close(day);
+    function close(d) {
+      const firsts = [...d.first.values()];
+      d.n = firsts.length; d.right = firsts.reduce((s, x) => s + x, 0); d.pct = Math.round(100 * d.right / d.n);
+      d.known = [...last.values()].reduce((s, x) => s + x, 0); d.seen = last.size;
+    }
+    return days.map(({ key, t, n, right, pct, known, seen }) => ({ day: key, t, n, right, pct, known, seen }));
+  }
+
   const DAILY_MAX = 60, LOW_TODAY = 50, EXTRA = 20;
   function pauseReason(today, ack, dailyMax) {
     const limit = (ack && ack.limit) || dailyMax || DAILY_MAX;
@@ -599,6 +630,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
