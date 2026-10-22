@@ -69,6 +69,9 @@
 
   function parseNumber(input) {
     let s = normalize(input).replace(/,/g, "").replace(/[−–]/g, "-");
+    // "約 2.14", "20 起", "15 個百分點": the answer as a learner says it, not a wrong answer
+    // (2026-10-22). Units that scale the number (萬, 千) are not stripped: "3.5萬" stays unreadable.
+    s = s.replace(/^(大約|約|≈|~|=)/, "").replace(/(個百分點|百分點|分鐘|小時|人|位|名|組|起|件|元|倍|分|歲|次|題|個|年|天|本)$/, "");
     let div = 1;
     if (s.endsWith("%")) { s = s.slice(0, -1); div = 100; }
     const frac = s.match(/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);

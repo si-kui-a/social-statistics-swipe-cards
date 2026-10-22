@@ -20,6 +20,10 @@ ok("num %: plain number", E.grade(pct, "23") === 1);
 ok("num %: with percent sign", E.grade(pct, "23%") === 1);
 ok("num %: proportion is not the percent", E.grade(pct, "0.23") === 0);
 ok("num: default tolerance", E.grade({ format: "num", num: { value: 100 } }, "100.4") === 1);
+ok("num: unit word after the number", E.grade({ format: "num", num: { value: 20 } }, "20 起") === 1);
+ok("num: approximately", E.grade({ format: "num", num: { value: 2.14, tol: 0.01 } }, "約 2.14") === 1);
+ok("num %: percentage points", E.grade({ format: "num", num: { value: 15, unit: "%" } }, "15 個百分點") === 1);
+ok("num: scaling unit stays unreadable", Number.isNaN(E.parseNumber("3.5萬")));
 
 // confidence: moves the schedule, not the score
 ok("sure right promotes", E.schedule({ box: 2 }, true, 0, 1).box === 3);
