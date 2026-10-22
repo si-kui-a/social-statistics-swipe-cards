@@ -886,6 +886,8 @@ function submit(isSure) {
   if (f === "flip") { phase = "back"; return render(); }
   if (f === "mc" && !picked) { $("card").querySelector(".hint").textContent = "先點選一個答案"; return; }
   if (f === "num" && !typed.trim()) { $("card").querySelector(".hint").textContent = "先輸入答案"; return; }
+  // unreadable input is a typing slip, not a wrong answer: ask again instead of grading it
+  if (f === "num" && Number.isNaN(Engine.parseNumber(typed))) { $("card").querySelector(".hint").textContent = "只填數字，例如 23、23% 或 1/4"; return; }
   if (f === "essay") { ticks = Engine.matchPoints(c, typed); phase = "rubric"; return render(); }
   record(Engine.grade(c, f === "mc" ? picked : typed));
 }
