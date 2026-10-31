@@ -34,7 +34,7 @@
   // is 1/k, as in a three-parameter IRT model. Without it a guessed answer reads as knowledge, the
   // ability estimate runs high and harder cards come too early.
   function expected(theta, card) {
-    const k = card.format === "mc" && card.choices ? card.choices.length : 0;
+    const k = (card.format === "mc" || card.format === "truefalse") && card.choices ? card.choices.length : 0;
     const floor = k > 1 ? 1 / k : 0;
     return floor + (1 - floor) * prob(theta, level(card));
   }
@@ -81,7 +81,7 @@
 
   // Returns a score from 0 to 1. mc: picked letter; num: typed text; essay: array of ticks.
   function grade(card, response) {
-    if (card.format === "mc") return (card.answer || []).includes(response) ? 1 : 0;
+    if (card.format === "mc" || card.format === "truefalse") return (card.answer || []).includes(response) ? 1 : 0;
     if (card.format === "num") {
       // A percent answer (num.unit "%", value 23 for 23%) accepts "23" and "23%": parseNumber reads
       // "23%" as 0.23, which would otherwise mark the right answer wrong.

@@ -366,4 +366,7 @@ ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache
 }
 
 console.log(`${fails} failed`);
+const tf = { format: "truefalse", answer: ["O"], choices: [["O", "正確"], ["X", "錯誤"]] };
+ok("truefalse: right pick", E.grade(tf, "O") === 1);
+ok("truefalse: wrong pick", E.grade(tf, "X") === 0);
 process.exit(fails ? 1 : 0);
