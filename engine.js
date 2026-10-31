@@ -34,7 +34,7 @@
   // is 1/k, as in a three-parameter IRT model. Without it a guessed answer reads as knowledge, the
   // ability estimate runs high and harder cards come too early.
   function expected(theta, card) {
-    const k = card.format === "mc" && card.choices ? card.choices.length : 0;
+    const k = (card.format === "mc" || card.format === "truefalse") && card.choices ? card.choices.length : 0;
     const floor = k > 1 ? 1 / k : 0;
     return floor + (1 - floor) * prob(theta, level(card));
   }
@@ -81,7 +81,7 @@
 
   // Returns a score from 0 to 1. mc: picked letter; num: typed text; essay: array of ticks.
   function grade(card, response) {
-    if (card.format === "mc") return (card.answer || []).includes(response) ? 1 : 0;
+    if (card.format === "mc" || card.format === "truefalse") return (card.answer || []).includes(response) ? 1 : 0;
     if (card.format === "num") {
       // A percent answer (num.unit "%", value 23 for 23%) accepts "23" and "23%": parseNumber reads
       // "23%" as 0.23, which would otherwise mark the right answer wrong.
@@ -450,6 +450,18 @@
   // 國考-style score out of 100: each section is worth its points (default: every question the same), each
   // question points/n times its graded score (partial for essays), unanswered 0. Sections the deck could not
   // fill at all (pending) are left out and the rest scaled to 100. Returns the total and per-section points.
+  // Progress follows a reworded card: card ids hash the question, so the deck lists old -> new ids.
+  function applyRenames(state, renamed) {
+    for (const store of [state.progress, state.essays]) {
+      for (const [from, to] of Object.entries(renamed || {})) {
+        if (!store || !(from in store)) continue;
+        if (to && !(to in store)) store[to] = store[from];
+        if (to) delete store[from];
+      }
+    }
+    return state;
+  }
+
   function examScore(exam, section, results) {
     const drawn = new Map();
     for (const name of Object.values(section)) drawn.set(name, (drawn.get(name) || 0) + 1);
@@ -636,6 +648,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

@@ -85,6 +85,10 @@ header .seg button { font-size: .95rem; padding: 6px; }
 blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
 /* Wide tables (e.g. regression output) scroll on their own instead of the whole card. */
 pre { margin: 0; max-width: 100%; overflow-x: auto; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; }
+.tbl { max-width: 100%; overflow-x: auto; margin: 6px 0; }
+.tbl table { border-collapse: collapse; font-size: .8rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.tbl th, .tbl td { border: 1px solid var(--muted); padding: 3px 6px; text-align: left; vertical-align: top; }
+.tbl th { font-weight: 700; }
 .a { border-top: 1px dashed var(--line); padding-top: 12px; }
 .progress-box { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
 .prog-line { margin: 4px 0; font-size: .9rem; }
@@ -354,6 +358,7 @@ const SHARE_KEY = "swipe-share", SHARE_QUEUE = "swipe-share-queue", SHARE_QUEUE_
 let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
+let renamed = {};  // old card id -> new (deck JSON), see Engine.applyRenames
 
 function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [], examLog: {} }; }
 function load() {
@@ -361,6 +366,7 @@ function load() {
   try {
     const s = JSON.parse(localStorage.getItem(D().key) || "null");
     if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [], rounds: s.rounds || {}, history: s.history || [] };
+    Engine.applyRenames(state, renamed);
   } catch (e) { /* storage blocked: practise without saving */ }
 }
 // Say why a save failed: a full store needs an export, blocked storage cannot be fixed from here.
@@ -389,23 +395,37 @@ function clearDraft() { clearTimeout(draftTimer); try { localStorage.removeItem(
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function md(text) {
-  // **bold**, "> " quote lines, ``` code fences and line breaks; everything escaped first.
-  let html = "", quote = false, code = false;
+  // **bold**, "> " quote lines, ``` code fences, | tables and line breaks; everything escaped first.
+  let html = "", quote = false, code = false, rows = [];
+  const flush = () => { if (rows.length) html += tableHtml(rows); rows = []; };
   for (const raw of esc(text).split("\n")) {
+    if (!code && raw.startsWith("|")) { rows.push(raw); continue; }
+    flush();
     if (raw.startsWith("```")) { html += code ? "</pre>" : "<pre>"; code = !code; continue; }
     if (code) { html += raw + "\n"; continue; }
-    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // bold hugs its text: "***p<0.001; **p<0.01" is a significance note, not bold
+    const line = raw.replace(/\*\*(?=[^\s*])(.+?)(?<=[^\s*])\*\*/g, "<strong>$1</strong>");
     const q = line.startsWith("&gt;");
     if (q && !quote) { html += "<blockquote>"; quote = true; }
     if (!q && quote) { html += "</blockquote>"; quote = false; }
     html += (q ? line.replace(/^&gt; ?/, "") : line) + "<br>";
   }
+  flush();
   return html + (quote ? "</blockquote>" : "") + (code ? "</pre>" : "");
+}
+// A real table: columns of spaces drift on a phone (issues #53, #58). Scrolls sideways when wide.
+function tableHtml(rows) {
+  const cells = r => r.replace(/^\||\|$/g, "").split("|").map(s => s.trim());
+  const body = rows.filter(r => !/^\|[\s|:-]+\|?$/.test(r)).map(cells);
+  const row = (r, tag) => `<tr>${r.map(c => `<${tag}>${c}</${tag}>`).join("")}</tr>`;
+  if (!body.length) return rows.join("<br>") + "<br>";  // a lone "|" a learner typed is just text
+  return `<div class="tbl"><table><thead>${row(body[0], "th")}</thead><tbody>${body.slice(1).map(r => row(r, "td")).join("")}</tbody></table></div>`;
 }
 
 function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
 function byId(id) { return allCards().find(c => c.id === id); }
-function format(c) { return ["mc", "num", "essay"].includes(c.format) ? c.format : "flip"; }
+// 是非 cards are two-choice cards (○／✗) on the card; only exam sections tell them apart, by c.format.
+function format(c) { return c.format === "truefalse" ? "mc" : ["mc", "num", "essay"].includes(c.format) ? c.format : "flip"; }
 function ui() {
   if (!state.ui || !state.ui.pace) state.ui = { scope: "all", group: "all", chapters: [], mix: false, pace: "sched", ...state.ui };
   if (!state.ui.dailyMax) state.ui.dailyMax = Engine.DAILY_MAX;
@@ -1028,8 +1048,8 @@ window.addEventListener("keydown", e => {
   if (e.key === "z" || e.key === "Z") return undoLast();
   if (!current) return;
   const f = format(current);
-  if (phase === "front" && f === "mc" && /^[1-5a-eA-E]$/.test(e.key)) {
-    const k = /\d/.test(e.key) ? "ABCDE"[Number(e.key) - 1] : e.key.toUpperCase();
+  if (phase === "front" && f === "mc" && /^[1-5a-eA-EoOxX]$/.test(e.key)) {
+    const k = /\d/.test(e.key) ? ((current.choices || [])[Number(e.key) - 1] || [])[0] : e.key.toUpperCase();
     if ((current.choices || []).some(([x]) => x === k)) { picked = k; render(); }
   } else if (phase === "front" && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); submit(e.key === "ArrowUp"); }
   else if (phase === "back" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) record(e.key === "ArrowRight" ? 1 : 0);
@@ -1319,6 +1339,7 @@ async function openDeck(id) {
   renderDecks(); load(); showUndoImport();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
+    renamed = doc.renamed || {}; Engine.applyRenames(state, renamed);
     deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || []; voices = doc.voices || {};
     renderSources(doc.sources || []);
   } catch (e) { deck = []; scopes = []; voices = {}; renderSources([]); }
