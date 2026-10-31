@@ -369,4 +369,7 @@ console.log(`${fails} failed`);
 const tf = { format: "truefalse", answer: ["O"], choices: [["O", "正確"], ["X", "錯誤"]] };
 ok("truefalse: right pick", E.grade(tf, "O") === 1);
 ok("truefalse: wrong pick", E.grade(tf, "X") === 0);
+const moved = E.applyRenames({ progress: { a: { box: 3 }, keep: { box: 1 } }, essays: { a: ["x"] } }, { a: "b", gone: null });
+ok("rename: progress follows", moved.progress.b.box === 3 && !moved.progress.a && moved.essays.b[0] === "x");
+ok("rename: newer progress wins", E.applyRenames({ progress: { a: { box: 3 }, b: { box: 1 } } }, { a: "b" }).progress.b.box === 1);
 process.exit(fails ? 1 : 0);

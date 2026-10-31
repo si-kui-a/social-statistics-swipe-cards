@@ -358,6 +358,7 @@ const SHARE_KEY = "swipe-share", SHARE_QUEUE = "swipe-share-queue", SHARE_QUEUE_
 let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
+let renamed = {};  // old card id -> new (deck JSON), see Engine.applyRenames
 
 function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [], examLog: {} }; }
 function load() {
@@ -365,6 +366,7 @@ function load() {
   try {
     const s = JSON.parse(localStorage.getItem(D().key) || "null");
     if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [], rounds: s.rounds || {}, history: s.history || [] };
+    Engine.applyRenames(state, renamed);
   } catch (e) { /* storage blocked: practise without saving */ }
 }
 // Say why a save failed: a full store needs an export, blocked storage cannot be fixed from here.
@@ -1337,6 +1339,7 @@ async function openDeck(id) {
   renderDecks(); load(); showUndoImport();
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
+    renamed = doc.renamed || {}; Engine.applyRenames(state, renamed);
     deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || []; voices = doc.voices || {};
     renderSources(doc.sources || []);
   } catch (e) { deck = []; scopes = []; voices = {}; renderSources([]); }

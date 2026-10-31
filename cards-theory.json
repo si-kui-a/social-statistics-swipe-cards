@@ -12211,5 +12211,16 @@
    "license": "原文公有領域；中譯 CC BY-SA 4.0",
    "url": "https://de.wikisource.org/wiki/Politik_als_Beruf"
   }
- ]
+ ],
+ "renamed": {
+  "cM1-bank-a5ffa671": "cM1-bank-51894db6",
+  "cM1-bank-bbe09615": "cM1-bank-34508b5e",
+  "cM2-bank-24588739": "cM2-bank-a5fdab26",
+  "cM2-bank-3037fe9f": "cM2-bank-bd531e38",
+  "cM2-bank-5a64e9a1": "cM2-bank-c22d9e23",
+  "cM2-bank-68424d01": "cM2-bank-29ea68b3",
+  "cM2-bank-811f25f7": "cM2-bank-d8177d9a",
+  "cM2-bank-b56f1a00": "cM2-bank-da2aa1d8",
+  "cD2-bank-e4b1adf1": "cD2-bank-218072c3"
+ }
 }

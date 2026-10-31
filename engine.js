@@ -450,6 +450,18 @@
   // 國考-style score out of 100: each section is worth its points (default: every question the same), each
   // question points/n times its graded score (partial for essays), unanswered 0. Sections the deck could not
   // fill at all (pending) are left out and the rest scaled to 100. Returns the total and per-section points.
+  // Progress follows a reworded card: card ids hash the question, so the deck lists old -> new ids.
+  function applyRenames(state, renamed) {
+    for (const store of [state.progress, state.essays]) {
+      for (const [from, to] of Object.entries(renamed || {})) {
+        if (!store || !(from in store)) continue;
+        if (to && !(to in store)) store[to] = store[from];
+        if (to) delete store[from];
+      }
+    }
+    return state;
+  }
+
   function examScore(exam, section, results) {
     const drawn = new Map();
     for (const name of Object.values(section)) drawn.set(name, (drawn.get(name) || 0) + 1);
@@ -636,6 +648,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
