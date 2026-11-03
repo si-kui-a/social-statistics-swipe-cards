@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Site page</title>
+<!-- A stand-in for another site that runs this app through boot.js (see README "給其他網站共用");
+     site-check.html opens it and checks that its decks, keys, texts and palette are used. -->
+<script>
+window.SITE = {
+  decks: { demo: { title: "共用測試", file: "site-deck.json", key: "site-test-v1", newStart: 5 } },
+  deckKey: "site-test-deck", app: "site-test", repo: "si-kui-a/site-test",
+  texts: { creditsReport: "測試網站的回報說明" },
+  palette: { paper: "#202028", card: "#2a2a34" }, colorScheme: "dark",
+};
+</script>
+<script src="../boot.js"></script>
+</head>
+<body></body>
+</html>

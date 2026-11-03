@@ -1,0 +1,10 @@
+{
+  "generated": "2026-11-03",
+  "count": 2,
+  "scopes": [],
+  "cards": [
+    {"id": "demo-1", "chapter": "U1", "label": "第一單元", "kind": "bank", "format": "flip", "level": 1, "q": "共用測試的第一題", "a": "答案一"},
+    {"id": "demo-2", "chapter": "U1", "label": "第一單元", "kind": "bank", "format": "flip", "level": 1, "q": "共用測試的第二題", "a": "答案二"}
+  ],
+  "sources": [{"name": "測試來源", "basis": "只供 tests/site-check.html 使用", "license": "無"}]
+}

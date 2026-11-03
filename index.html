@@ -303,12 +303,12 @@ table.t td.n, table.t th.n { text-align: right; }
         </dl>
       </section>
     <section class="stack" id="page-credits" hidden>
-      <p class="small">國考試題依著作權法第 9 條不受保護；其餘題目、解說與評分要點多由 AI（Claude）撰寫，非官方，以 CC BY-SA 4.0 釋出（可分享改寫，須標示出處並同授權）。App 程式保留所有權利。</p>
+      <p class="small" id="creditsLicence">國考試題依著作權法第 9 條不受保護；其餘題目、解說與評分要點多由 AI（Claude）撰寫，非官方，以 CC BY-SA 4.0 釋出（可分享改寫，須標示出處並同授權）。App 程式保留所有權利。</p>
       <h4 class="facts-head" id="sourcesTitle">題目來源</h4>
       <div class="rows" id="deckSources"></div>
       <h4 class="facts-head" id="figuresTitle" hidden>人物圖片與引文</h4>
       <div class="rows" id="deckFigures"></div>
-      <p class="small">每張卡翻面後的「出處」列出年度、考試或教材。發現錯誤或有疑慮：翻面後按「回報這題有誤或有疑慮」，或到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue，確認後立即修正或移除。</p>
+      <p class="small" id="creditsReport">每張卡翻面後的「出處」列出年度、考試或教材。發現錯誤或有疑慮：翻面後按「回報這題有誤或有疑慮」，或到 GitHub 倉庫 si-kui-a/social-statistics-swipe-cards 開 issue，確認後立即修正或移除。</p>
     </section>
   </div>
 </dialog>
@@ -321,15 +321,21 @@ const HINT = { mc: "", num: "可用小數、分數或百分比", essay: "", flip
 // Each deck keeps its own cards, progress, ability estimates and exports, so the subjects never mix.
 // The statistics deck keeps the storage key it had before decks existed. newStart is the number of
 // new cards per round before the app has learned anything about the learner (engine.js adjusts it).
-const DECKS = {
+// Another page on this origin can run this same app with its own decks, storage keys, texts and palette
+// (10-1001 Deutsch Weg's Indonesian page): it sets window.SITE and loads boot.js. Without window.SITE
+// every value below is this site's own, so nothing changes here. See README "給其他網站共用".
+const SITE = window.SITE || null;
+const DECKS = SITE ? SITE.decks : {
   stats: { title: "社會統計", file: "cards.json", key: "swipe-cards-v1", newStart: 15 },
   research: { title: "社會研究法", file: "cards-research.json", key: "swipe-cards-research-v1", newStart: 20 },
   theory: { title: "社會學理論", file: "cards-theory.json", key: "swipe-cards-theory-v1", newStart: 15 },
 };
-const DECK_KEY = "swipe-cards-deck";
+const FIRST_DECK = Object.keys(DECKS)[0];
+const DECK_KEY = SITE ? SITE.deckKey : "swipe-cards-deck";
+const APP_NAME = SITE ? SITE.app : "social-statistics-swipe-cards";
 const KEEP_ROUNDS = 12, KEEP_HISTORY = 60, KEEP_EXAM_LOG = 10;
 
-let deckId = "stats", deck = [], scopes = [], state = blank(), queue = [], current = null;
+let deckId = FIRST_DECK, deck = [], scopes = [], state = blank(), queue = [], current = null;
 // The round being played. Each selection (pace + scope + group + chapters) keeps its own round in
 // state.rounds, so switching chapters and back resumes it instead of drawing a new one: the counts on
 // screen no longer jump when the learner looks at another chapter (2026-10-13 request).
@@ -353,7 +359,8 @@ const UNDO_MS = 8000;
 // Anonymous sharing (opt-in): the Apps Script web app that receives the rows (apps-script/Code.gs).
 /// Empty until it is deployed: then nothing is asked and nothing is sent. let, so the layout check can
 // point it at a stub.
-let SHARE_URL = "";
+// Answers go only to this site's own collector, never from another site's page
+let SHARE_URL = SITE ? "" : "";
 const SHARE_KEY = "swipe-share", SHARE_QUEUE = "swipe-share-queue", SHARE_QUEUE_MAX = 2000, SHARE_BATCH = 200;
 let undo = null, advanceTimer = null, undoTicker = null;
 const $ = id => document.getElementById(id);
@@ -1188,7 +1195,7 @@ $("addForm").addEventListener("submit", e => {
 });
 
 function exportText() {
-  return JSON.stringify({ schemaVersion: Engine.EXPORT_VERSION, exported: new Date().toISOString(), app: "social-statistics-swipe-cards", deck: deckId,
+  return JSON.stringify({ schemaVersion: Engine.EXPORT_VERSION, exported: new Date().toISOString(), app: APP_NAME, deck: deckId,
                           progress: state.progress, mine: state.mine, model: state.model, settings: state.settings,
                           essays: state.essays, history: state.history }, null, 1);
 }
@@ -1281,7 +1288,7 @@ function renderDecks() {
 
 // A problem report opens a prefilled GitHub issue (2026-10-15 plan item 2): the card id makes the
 // 出處與著作權 promise to fix or remove a card workable. The text sent is only what the card shows.
-const REPO_ISSUES = "https://github.com/si-kui-a/social-statistics-swipe-cards/issues/new";
+const REPO_ISSUES = `https://github.com/${SITE ? SITE.repo : "si-kui-a/social-statistics-swipe-cards"}/issues/new`;
 function reportUrl(c) {
   const title = `[${D().title}] ${c.id}：`;
   const body = [`題庫：${D().title}`, `卡片：${c.id}（${c.label || c.chapter}）`, `題目開頭：${String(c.q).slice(0, 80)}`, "",
@@ -1333,7 +1340,7 @@ $("page").addEventListener("click", e => { if (e.target === $("page")) $("page")
 
 async function openDeck(id) {
   if (round) save();
-  deckId = DECKS[id] ? id : "stats";
+  deckId = DECKS[id] ? id : FIRST_DECK;
   try { localStorage.setItem(DECK_KEY, deckId); } catch (e) { /* remembered for this visit only */ }
   round = null; current = null; queue = []; $("backupStatus").textContent = ""; $("addStatus").textContent = "";
   renderDecks(); load(); showUndoImport();
@@ -1354,10 +1361,19 @@ $("decks").addEventListener("click", e => {
   if (b && b.dataset.deck !== deckId) openDeck(b.dataset.deck);
 });
 
+// A site's own texts and palette; inline custom properties outrank both colour-scheme blocks of the stylesheet.
+function applySite() {
+  if (!SITE) return;
+  for (const [id, text] of Object.entries(SITE.texts || {})) if ($(id)) $(id).textContent = text;
+  for (const [name, value] of Object.entries(SITE.palette || {})) document.documentElement.style.setProperty(`--${name}`, value);
+  if (SITE.colorScheme) document.documentElement.style.colorScheme = SITE.colorScheme;
+}
+
 async function start() {
+  applySite();
   showOnline();
-  let saved = "stats";
-  try { saved = localStorage.getItem(DECK_KEY) || "stats"; } catch (e) { /* storage blocked */ }
+  let saved = FIRST_DECK;
+  try { saved = localStorage.getItem(DECK_KEY) || FIRST_DECK; } catch (e) { /* storage blocked */ }
   await openDeck(saved);
   flushShare();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
