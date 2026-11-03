@@ -482,7 +482,10 @@
   function buildExam(cards, exam, rnd = Math.random, log = [], progress = {}) {
     const sc = exam.scope || {};
     const under = (c, prefixes) => prefixes.some(p => String(c.chapter).startsWith(p));
-    const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters)));
+    // tags: only cards carrying one of them (印尼文: words from the class notes, 2026-11-03 "筆記有出現的必須要")
+    const tagged = (c, tags) => (c.tags || []).some(t => tags.includes(t));
+    const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters))
+                                   && (!sc.tags || tagged(c, sc.tags)));
     const used = new Set(), ids = [], section = {}, short = [];
     const lvl = examLevel(log), skip = new Set(log.slice(-EXAM_SKIP).flatMap(r => r.right || []));
     const draw = (list, n) => exam.spread ? acrossChapters(list, n) : list.slice(0, n);
@@ -495,9 +498,11 @@
       let take;
       if (s.formats.includes("essay")) take = draw(cand, s.n);
       else {  // stable sort: still random within a level
+        // first: tags of key cards (筆記的星號重點) drawn before the rest, even if answered right lately
+        const key = c => !!s.first && tagged(c, s.first);
         const gap = c => Math.abs(effectiveLevel(c, progress) - lvl);
-        const near = list => list.sort((a, b) => gap(a) - gap(b));
-        take = draw(near(cand.filter(c => !skip.has(c.id))), s.n);
+        const near = list => list.sort((a, b) => key(b) - key(a) || gap(a) - gap(b));
+        take = draw(near(cand.filter(c => key(c) || !skip.has(c.id))), s.n);
         if (take.length < s.n) take = take.concat(draw(near(cand.filter(c => skip.has(c.id))), s.n - take.length));
       }
       for (const c of take) { used.add(c.id); ids.push(c.id); section[c.id] = s.name; }

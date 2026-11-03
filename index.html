@@ -429,8 +429,10 @@ function tableHtml(rows) {
   return `<div class="tbl"><table><thead>${row(body[0], "th")}</thead><tbody>${body.slice(1).map(r => row(r, "td")).join("")}</tbody></table></div>`;
 }
 
-function allCards() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
-function byId(id) { return allCards().find(c => c.id === id); }
+// examOnly cards (印尼文: Indonesian-worded questions, 2026-11-03) appear in mock exams only, not in practice or stats
+function everyCard() { return deck.concat(state.mine.map(m => ({ ...m, kind: "mine" }))); }
+function allCards() { return everyCard().filter(c => !c.examOnly); }
+function byId(id) { return everyCard().find(c => c.id === id); }
 // 是非 cards are two-choice cards (○／✗) on the card; only exam sections tell them apart, by c.format.
 function format(c) { return c.format === "truefalse" ? "mc" : ["mc", "num", "essay"].includes(c.format) ? c.format : "flip"; }
 function ui() {
@@ -470,7 +472,7 @@ function newRound(opts = {}) {
   if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
   else if (pace === "exam") {
     const spec = exams.find(e => e.id === ui().exam) || exams[0];
-    const b = spec ? Engine.buildExam(allCards(), spec, Math.random, state.examLog[spec.id] || [], state.progress) : { ids: [], section: {}, short: [] };
+    const b = spec ? Engine.buildExam(everyCard(), spec, Math.random, state.examLog[spec.id] || [], state.progress) : { ids: [], section: {}, short: [] };
     list = b.ids.map(byId).filter(Boolean);
     if (spec) {
       label = spec.title;

@@ -195,6 +195,15 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("exam: chapter-code scope", byPrefix.ids.join() === "x1");
   const topical = [{ id: "b1", format: "flip", q: "箱形圖的上鬚畫到哪裡？" }, { id: "b2", format: "flip", q: "全距是什麼？" }];
   ok("exam: section match keeps its topic", E.buildExam(topical, { sections: [{ name: "箱形圖", n: 2, formats: ["flip"], match: "箱形圖" }] }, () => 0).ids.join() === "b1");
+  // tags narrow the scope; first puts key cards ahead of every other, even ones answered right lately
+  const noted = [{ id: "t1", format: "mc", tags: ["筆記"] }, { id: "t2", format: "mc", tags: ["筆記", "重點"] },
+                 { id: "t3", format: "mc" }, { id: "t4", format: "mc", tags: ["筆記"] }];
+  const tagSpec = { scope: { tags: ["筆記"] }, sections: [{ name: "選", n: 3, formats: ["mc"], first: ["重點"] }] };
+  ok("exam: tags scope", E.buildExam(noted, tagSpec, Math.random).ids.sort().join() === "t1,t2,t4");
+  const firstOnly = { ...tagSpec, sections: [{ ...tagSpec.sections[0], n: 1 }] };
+  ok("exam: first draws key cards even if answered right",
+     Array.from({ length: 20 }, () => E.buildExam(noted, firstOnly, Math.random, [{ score: 100, right: ["t2"] }]).ids.join())
+       .every(ids => ids === "t2"));
   // spread: one per chapter before any chapter gives a second; pending sections say so instead of n/m
   const many = ["2M1", "2M1", "2M1", "2M2", "2M3"].map((chapter, i) => ({ id: `s${i}`, chapter, format: "mc" }));
   const sp = E.buildExam(many, { spread: true, sections: [{ name: "選擇", n: 3, formats: ["mc"] },
