@@ -333,6 +333,26 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
 ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw));
 
+// sw: sites on this origin share one cache storage (another site runs this app through boot.js and imports
+// sw.js), so activating one site's worker deletes only that site's older caches, never the other's.
+async function swDeletes(siteCache) {
+  const handlers = {}, deleted = [];
+  const keys = ["swipe-cards-v15", "swipe-cards-v16", "id-swipe-cards-v1", "id-swipe-cards-v2"];
+  const self = { SITE_CACHE: siteCache, addEventListener: (t, f) => { handlers[t] = f; }, clients: { claim: () => Promise.resolve() } };
+  const caches = { keys: () => Promise.resolve(keys), delete: k => { deleted.push(k); return Promise.resolve(true); } };
+  require("vm").runInNewContext(sw, { self, caches, URL, fetch: () => Promise.reject(new Error("offline")) });
+  let wait = null;
+  handlers.activate({ waitUntil: p => { wait = p; } });
+  await wait;
+  return deleted.sort().join(",");
+}
+const swChecks = (async () => {
+  const own = (sw.match(/self\.SITE_CACHE \|\| "([\w-]+)"/) || [])[1];
+  ok("sw: this site deletes only its own older caches",
+    await swDeletes(undefined) === ["swipe-cards-v15", "swipe-cards-v16"].filter(k => k !== own).join(","));
+  ok("sw: another site deletes only its own older caches", await swDeletes("id-swipe-cards-v2") === "id-swipe-cards-v1");
+})();
+
 // portraits: every file in img/ is cached offline, each at most 30 KB (改善規劃.md cost check), and every
 // voice in a deck points at one of them, carries a sourced quote and a text for a 危險 streak
 {
@@ -374,4 +394,4 @@ ok("truefalse: wrong pick", E.grade(tf, "X") === 0);
 const moved = E.applyRenames({ progress: { a: { box: 3 }, keep: { box: 1 } }, essays: { a: ["x"] } }, { a: "b", gone: null });
 ok("rename: progress follows", moved.progress.b.box === 3 && !moved.progress.a && moved.essays.b[0] === "x");
 ok("rename: newer progress wins", E.applyRenames({ progress: { a: { box: 3 }, b: { box: 1 } } }, { a: "b" }).progress.b.box === 1);
-process.exit(fails ? 1 : 0);
+swChecks.then(() => process.exit(fails ? 1 : 0));

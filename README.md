@@ -124,14 +124,40 @@
 | `index.html` | 版面與操作 |
 | `engine.js` | 批改、能力估計、選題與每輪新卡數（不碰畫面） |
 | `engine.test.js` | `engine.js` 的測試：`node engine.test.js` |
-| `layout.test.js` | 手機版面檢查（390×844，用本機 Chrome）：每種題型的作答區與按鈕都要在第一屏內，`node layout.test.js`；CI 也會跑 |
+| `layout.test.js` | 手機版面檢查（390×844，用本機 Chrome）：每種題型的作答區與按鈕都要在第一屏內；另外用 `tests/site-check.html` 檢查其他網站共用時的設定（見下方）。`node layout.test.js`；CI 也會跑 |
 | `cards.json` | 社會統計題目，由產生程式覆寫，不要手動編輯 |
 | `cards-research.json` | 社會研究法題目，由產生程式覆寫，不要手動編輯 |
 | `cards-theory.json` | 社會學理論題目，由課程倉庫的 `theory_cards.py export` 覆寫，不要手動編輯 |
-| `sw.js` | 離線快取 |
+| `sw.js` | 離線快取；其他網站也匯入同一份（見下方「給其他網站共用」） |
+| `boot.js` | 讓同網域的其他網站執行這個 App（見下方「給其他網站共用」） |
 | `apps-script/Code.gs` | 匿名回傳的接收端（貼到 Google Apps Script 部署；部署步驟寫在檔案開頭） |
 | `改善規劃.md` | 競品比較後的改善提案、多語化規劃與排序（尚未實作） |
 | `LICENSE` | CC BY-SA 4.0 全文（適用範圍見上方「授權」） |
 | `SECURITY.md` | 弱點回報方式 |
 | `.github/dependabot.yml` | 每週檢查 GitHub Actions 是否有新版 |
 | `manifest.webmanifest`、圖示 | 加到主畫面用 |
+
+## 給其他網站共用
+
+同網域（si-kui-a.github.io）的其他網站可以直接執行這個 App，不另外複製程式。目前使用的是 Deutsch Weg 的印尼文滑卡（`deutsch-weg/indonesian/`）。
+
+| 步驟 | 做法 |
+|---|---|
+| 設定 | 頁面先設定 `window.SITE`，再載入 `/social-statistics-swipe-cards/boot.js` |
+| 載入 | `boot.js` 讀這裡的 `index.html`，取用其中的樣式、版面與程式；這裡改了什麼，對方下次開啟時就會一起更新 |
+| 題庫 | 題卡檔、`sw.js` 都以對方頁面的位置為準，所以題目和離線快取由對方自己提供 |
+| 離線 | 對方的 `sw.js` 先設定 `SITE_CACHE`、`SITE_FILES`，再 `importScripts` 這裡的 `sw.js`。每個網站只刪除自己的舊快取 |
+
+`window.SITE` 的欄位：
+
+| 欄位 | 用途 |
+|---|---|
+| `decks` | 題庫清單，格式同 `index.html` 的 `DECKS`；成績的儲存 key 要和這裡不同 |
+| `deckKey` | 記住上次選哪個題庫的 key |
+| `app` | 匯出成績檔裡的 App 名稱 |
+| `repo` | 「回報這題有誤」要開 issue 的 GitHub 倉庫 |
+| `texts` | 依元素 id 替換文字，例如 `creditsLicence`、`creditsReport` |
+| `palette` | 覆寫配色變數（`paper`、`card`、`ink`、`accent` 等，去掉 `--`） |
+| `colorScheme` | `dark` 或 `light` |
+
+匿名回傳只在這個網站自己開啟，其他網站一律不送。`layout.test.js` 用 `tests/site-page.html` 模擬其他網站，並在本站已經存有成績的情況下檢查：對方使用自己的題庫、key、文字與配色，而且不會動到本站的資料。

@@ -49,7 +49,7 @@ if (!csp || /unsafe-eval/.test(csp) || !/default-src 'self'/.test(csp)) {
   console.log("FAIL index.html: needs a Content-Security-Policy with default-src 'self' and no 'unsafe-eval'");
   process.exit(1);
 }
-for (const page of ["tests/layout-check.html", "index.html"]) {
+for (const page of ["tests/layout-check.html", "tests/site-check.html", "tests/site-page.html", "index.html"]) {
   const html = fs.readFileSync(path.join(ROOT, page), "utf8");
   for (const [, code] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
     try { new Function(code); } catch (e) {  // compiles only; nothing runs
@@ -59,23 +59,33 @@ for (const page of ["tests/layout-check.html", "index.html"]) {
   }
 }
 
-server.listen(0, "127.0.0.1", () => {
-  const url = `http://127.0.0.1:${server.address().port}/tests/layout-check.html`;
+// Each check page runs in its own Chrome: the phone layout, and another site running this app through
+// boot.js (tests/site-check.html, see README "給其他網站共用").
+const PAGES = ["tests/layout-check.html", "tests/site-check.html"];
+
+function runPage(page) {
+  const url = `http://127.0.0.1:${server.address().port}/${page}`;
   const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--no-first-run",
                 "--virtual-time-budget=20000", "--dump-dom", url];
-  execFile(CHROME, args, { timeout: 60000, windowsHide: true }, (err, stdout) => {
-    server.close();
+  return new Promise(done => execFile(CHROME, args, { timeout: 60000, windowsHide: true }, (err, stdout) => {
     const m = /<pre id="out">([\s\S]*?)<\/pre>/.exec(stdout || "");
     let result = null;
     try { result = m && JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")); }
     catch (e) { /* reported below */ }
-    if (!result) {
-      console.log(`FAIL layout check produced no result${err ? ` (${err.message.split("\n")[0]})` : ""}`);
-      process.exit(1);
-    }
+    done(result || { seen: [], failures: [`${page} produced no result${err ? ` (${err.message.split("\n")[0]})` : ""}`] });
+  }));
+}
+
+server.listen(0, "127.0.0.1", async () => {
+  let failed = 0, seen = 0;
+  for (const page of PAGES) {
+    const result = await runPage(page);
     for (const s of result.seen) console.log(`checked ${s}`);
     for (const f of result.failures) console.log(`FAIL ${f}`);
-    console.log(`${result.failures.length} failed`);
-    process.exit(result.failures.length || !result.seen.length ? 1 : 0);
-  });
+    failed += result.failures.length; seen += result.seen.length;
+    if (!result.seen.length && !result.failures.length) { console.log(`FAIL ${page} checked nothing`); failed++; }
+  }
+  server.close();
+  console.log(`${failed} failed`);
+  process.exit(failed || !seen ? 1 : 0);
 });

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Site check</title>
+<!-- Loaded by layout.test.js in headless Chrome. Opens tests/site-page.html, a stand-in for another site
+     that runs this app through boot.js, with this site's own saved choice already in storage: the other
+     site must use its own decks, keys, texts and palette and leave this site's storage alone. -->
+</head>
+<body style="margin:0">
+<pre id="out">pending</pre>
+<script>
+(async () => {
+  const out = document.getElementById("out");
+  const failures = [], seen = [];
+  const check = (name, ok) => { seen.push(name); if (!ok) failures.push(name); };
+  try {
+    localStorage.setItem("swipe-cards-deck", "research");  // this site's own saved deck choice
+    const f = document.createElement("iframe");
+    f.style.cssText = "width:390px;height:844px;border:0";
+    f.src = "site-page.html";
+    document.body.prepend(f);
+    await new Promise(r => f.addEventListener("load", r));
+    const W = f.contentWindow, D = f.contentDocument;
+    for (let i = 0; i < 40 && !/共用測試的/.test((D.getElementById("card") || {}).textContent || ""); i++) {
+      await new Promise(r => setTimeout(r, 100));  // boot.js fetches index.html, then the deck arrives
+    }
+    check("site: the other site's deck is shown", /共用測試的/.test(D.getElementById("card").textContent));
+    check("site: title comes from its deck", D.getElementById("title").textContent === "共用測試滑卡");
+    check("site: palette overrides the stylesheet",
+      getComputedStyle(D.documentElement).getPropertyValue("--paper").trim() === "#202028");
+    check("site: its texts replace this site's", D.getElementById("creditsReport").textContent === "測試網站的回報說明");
+    check("site: remembers its deck under its own key", localStorage.getItem("site-test-deck") === "demo");
+    check("site: this site's saved deck is untouched", localStorage.getItem("swipe-cards-deck") === "research");
+    check("site: export names the other app", JSON.parse(W.eval("exportText()")).app === "site-test");
+    check("site: problem reports go to its repository", W.eval("reportUrl({ id: 'demo-1', q: 'x' })").includes("si-kui-a/site-test/issues"));
+  } catch (e) {
+    failures.push(`site check crashed: ${e}`);
+  }
+  out.textContent = JSON.stringify({ seen, failures });
+})();
+</script>
+</body>
+</html>

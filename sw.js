@@ -1,10 +1,14 @@
 /// Copyright (c) 2026 si-kui-a. All rights reserved. The code is not open source; see README "授權".
 // Offline support: every file is cached on first visit. Pages and questions try the network first so
 // new cards appear when online, and fall back to the cached copy when offline.
-const CACHE = "swipe-cards-v16";
+// Another site that runs this app through boot.js sets SITE_CACHE and SITE_FILES and imports this file,
+// so both sites share one offline logic (see README "給其他網站共用").
+const CACHE = self.SITE_CACHE || "swipe-cards-v16";
+// Sites on the same origin share one cache storage: delete only this site's older versions, never another's
+const OWN = CACHE.replace(/\d+$/, "");
 // scholar portraits shown with the exam progress (engine.test.js checks this list against img/)
 const PORTRAITS = ["comte", "marx", "durkheim", "weber", "quetelet", "nightingale", "dubois", "bourdieu", "goffman", "giddens"].map(n => `img/${n}.webp`);
-const FILES = ["./", "index.html", "engine.js", "cards.json", "cards-research.json", "cards-theory.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
+const FILES = self.SITE_FILES || ["./", "index.html", "engine.js", "cards.json", "cards-research.json", "cards-theory.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
                "icon-512.png", "apple-touch-icon.png", ...PORTRAITS];
 
 self.addEventListener("install", event => {
@@ -13,7 +17,7 @@ self.addEventListener("install", event => {
 
 self.addEventListener("activate", event => {
   event.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k !== CACHE && k.startsWith(OWN)).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
