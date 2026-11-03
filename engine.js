@@ -410,7 +410,7 @@
   }
 
   // A mock exam from its spec in the deck file (exams[]): scope by course chapter (ch) or chapter-code
-  // prefixes (chapters), then each section's n cards of the given formats, in section order as on a real
+  // prefixes (chapters), then each section's n cards of the given formats (and question match), in section order as on a real
   // paper. Returns ids, each id's section, and the sections that came up short (too few cards yet).
   // Round-robin over chapters in the order the shuffled cards first name them, so a section draws from as
   // many chapters as it has questions (theory 模擬考辦法: 每份跨多章，不集中一章).
@@ -487,7 +487,10 @@
     const lvl = examLevel(log), skip = new Set(log.slice(-EXAM_SKIP).flatMap(r => r.right || []));
     const draw = (list, n) => exam.spread ? acrossChapters(list, n) : list.slice(0, n);
     for (const s of exam.sections) {
-      const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters)));
+      // match: a regex on the question, for a section the teacher named by topic (箱形圖一定考, 2026-11-03)
+      const topic = s.match ? new RegExp(s.match) : null;
+      const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters))
+                                    && (!topic || topic.test(c.q || "")));
       for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
       let take;
       if (s.formats.includes("essay")) take = draw(cand, s.n);
