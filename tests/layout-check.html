@@ -117,6 +117,21 @@
     if (table && table.getBoundingClientRect().right > W.innerWidth + 1) failures.push(`domain table overflows the screen (${Math.round(table.getBoundingClientRect().right)} > ${W.innerWidth})`);
     seen.push("stop/today counts cards, not retries");
     if (!new RegExp(`今天 ${total}/300 張`).test(D.getElementById("today").textContent)) failures.push(`today line: ${D.getElementById("today").textContent}`);
+    // A retry just after the answer was shown is no evidence of ability (2026-11-06): neither in the
+    // 繼續複習答錯的 round nor later in the round where the card was missed.
+    const abil = () => JSON.stringify(W.eval("state.model"));
+    seen.push("ability/retries are not evidence");
+    D.getElementById("retryMissed").click();
+    let abilBefore = abil();
+    W.eval("ans(true)");
+    if (abil() !== abilBefore) failures.push("a card in the 繼續複習答錯的 round moved the ability estimate");
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
+    W.eval("window.c0 = current; sure = 1; ans(false)");
+    abilBefore = abil();
+    if (abilBefore === "{}" || !W.eval("round.retried.includes(c0.id)")) failures.push("a confident miss was not counted or not queued for a retry");
+    W.eval("current = c0; ans(true)");
+    if (abil() !== abilBefore) failures.push("a retry later in the same round moved the ability estimate");
     W.eval("localStorage.clear(); load();");
     pick(`u => { u.pace = "all"; u.chapters = [${JSON.stringify(X)}, ${JSON.stringify(Y)}]; u.mix = true; u.dailyMax = 10; }`);
     for (let i = 0; i < 10; i++) W.eval("ans(true)");

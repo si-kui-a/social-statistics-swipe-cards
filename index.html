@@ -933,7 +933,10 @@ function record(score) {
   const f = format(c), entry = Engine.attempt(now, right, sure, score, f === "mc" ? picked : f === "num" ? typed : "");
   undo.shareId = queueShare(c, entry, !p.log.length);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
-  Engine.updateAbility(state.model, c, score);
+  // A retry of a missed card (later in its round, or in the 繼續複習答錯的 round) comes right after its
+  // answer was shown: no evidence of ability, and counting it let wrong-then-right read almost as right,
+  // so harder cards came too early (2026-11-06 red-team review).
+  if (!(round && (round.retry || round.retried.includes(c.id)))) Engine.updateAbility(state.model, c, score);
   if (round && !round.results.some(r => r.id === c.id)) {
     const given = f === "mc" ? picked : f === "num" ? typed : "";
     round.results.push({ id: c.id, label: c.label || c.chapter, type: c.type || KIND[c.kind] || "", right, sure, score,
