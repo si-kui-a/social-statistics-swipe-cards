@@ -204,6 +204,15 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
   ok("exam: first draws key cards even if answered right",
      Array.from({ length: 20 }, () => E.buildExam(noted, firstOnly, Math.random, [{ score: 100, right: ["t2"] }]).ids.join())
        .every(ids => ids === "t2"));
+  // item: a word asked once per exam; a key word rotates to a card not answered right lately (2026-11-05)
+  const words = [{ id: "a-pic", item: "a", format: "mc", q: "P", tags: ["重點"] }, { id: "a-tf", item: "a", format: "mc", q: "T", tags: ["重點"] },
+                 { id: "b-pic", item: "b", format: "mc", q: "P" }, { id: "b-tf", item: "b", format: "mc", q: "T" },
+                 { id: "c-pic", item: "c", format: "mc", q: "P" }, { id: "c-tf", item: "c", format: "mc", q: "T" }];
+  const twoSec = { sections: [{ name: "P", n: 2, formats: ["mc"], match: "^P", first: ["重點"] },
+                              { name: "T", n: 2, formats: ["mc"], match: "^T", first: ["重點"] }] };
+  const sittings = Array.from({ length: 30 }, () => E.buildExam(words, twoSec, Math.random, [{ score: 100, right: ["a-pic"] }]).ids);
+  ok("exam: a word asked once", sittings.every(ids => new Set(ids.map(id => id[0])).size === ids.length));
+  ok("exam: key word always asked, through the card not answered right", sittings.every(ids => ids.includes("a-tf") && !ids.includes("a-pic")));
   // spread: one per chapter before any chapter gives a second; pending sections say so instead of n/m
   const many = ["2M1", "2M1", "2M1", "2M2", "2M3"].map((chapter, i) => ({ id: `s${i}`, chapter, format: "mc" }));
   const sp = E.buildExam(many, { spread: true, sections: [{ name: "選擇", n: 3, formats: ["mc"] },
