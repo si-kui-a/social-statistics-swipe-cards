@@ -486,29 +486,49 @@
     const tagged = (c, tags) => (c.tags || []).some(t => tags.includes(t));
     const pool = cards.filter(c => (!sc.ch || sc.ch.includes(c.ch)) && (!sc.chapters || under(c, sc.chapters))
                                    && (!sc.tags || tagged(c, sc.tags)));
-    const used = new Set(), ids = [], section = {}, short = [];
+    const used = new Set(), items = new Set(), ids = [], section = {}, short = [];
     const lvl = examLevel(log), skip = new Set(log.slice(-EXAM_SKIP).flatMap(r => r.right || []));
     const draw = (list, n) => exam.spread ? acrossChapters(list, n) : list.slice(0, n);
-    for (const s of exam.sections) {
-      // match: a regex on the question, for a section the teacher named by topic (箱形圖一定考, 2026-11-03)
-      const topic = s.match ? new RegExp(s.match) : null;
-      const cand = pool.filter(c => !used.has(c.id) && s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters))
-                                    && (!topic || topic.test(c.q || "")));
-      for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+    const shuffle = list => {
+      for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+      return list;
+    };
+    // item: one question per word in an exam (印尼文 has a card per question type of each word; 2026-11-05
+    // the same word came back in several sections). A card without one is its own item.
+    const item = c => c.item || c.id;
+    const once = list => { const seen = new Set(); return list.filter(c => !seen.has(item(c)) && seen.add(item(c))); };
+    // match: a regex on the question, for a section the teacher named by topic (箱形圖一定考, 2026-11-03)
+    const fits = (c, s) => s.formats.includes(c.format || "flip") && (!s.chapters || under(c, s.chapters))
+                           && (!s.match || new RegExp(s.match).test(c.q || ""));
+    // first: each key item (筆記的星號重點) once per exam, even if answered right lately, but through a card
+    // picked at random among its sections' cards, those not answered right lately first, so key words
+    // rotate question types instead of bringing back the same cards (2026-11-05: 26 of 40 repeated)
+    const picked = exam.sections.map(() => []);
+    const keyCards = shuffle(pool.filter(c => exam.sections.some(s => s.first && tagged(c, s.first))))
+      .sort((a, b) => skip.has(a.id) - skip.has(b.id));  // stable: still random within each group
+    for (const c of keyCards) {
+      const j = exam.sections.findIndex((s, k) => s.first && tagged(c, s.first) && fits(c, s) && picked[k].length < s.n);
+      if (j < 0 || items.has(item(c))) continue;
+      picked[j].push(c); used.add(c.id); items.add(item(c));
+    }
+    exam.sections.forEach((s, j) => {
+      const cand = shuffle(pool.filter(c => !used.has(c.id) && !items.has(item(c)) && fits(c, s)));
+      const room = s.n - picked[j].length;
       let take;
-      if (s.formats.includes("essay")) take = draw(cand, s.n);
+      if (s.formats.includes("essay")) take = draw(once(cand), room);
       else {  // stable sort: still random within a level
-        // first: tags of key cards (筆記的星號重點) drawn before the rest, even if answered right lately
-        const key = c => !!s.first && tagged(c, s.first);
         const gap = c => Math.abs(effectiveLevel(c, progress) - lvl);
-        const near = list => list.sort((a, b) => key(b) - key(a) || gap(a) - gap(b));
-        take = draw(near(cand.filter(c => key(c) || !skip.has(c.id))), s.n);
-        if (take.length < s.n) take = take.concat(draw(near(cand.filter(c => skip.has(c.id))), s.n - take.length));
+        const near = list => once(list.sort((a, b) => gap(a) - gap(b)));
+        take = draw(near(cand.filter(c => !skip.has(c.id))), room);
+        const taken = new Set(take.map(item));
+        if (take.length < room) take = take.concat(draw(near(cand.filter(c => skip.has(c.id) && !taken.has(item(c)))), room - take.length));
       }
-      for (const c of take) { used.add(c.id); ids.push(c.id); section[c.id] = s.name; }
+      // key cards were placed first; shuffle so a section does not open with them every time (2026-11-05)
+      take = picked[j].length ? shuffle(picked[j].concat(take)) : take;
+      for (const c of take) { used.add(c.id); items.add(item(c)); ids.push(c.id); section[c.id] = s.name; }
       // pending: the deck has no card of this format yet (theory 是非 bank), named so instead of as a shortfall
       if (take.length < s.n) short.push(s.pending ? `${s.name}（題庫建置中）` : `${s.name} ${take.length}/${s.n}`);
-    }
+    });
     return { ids, section, short, level: lvl };
   }
 
