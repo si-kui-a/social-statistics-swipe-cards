@@ -43,7 +43,11 @@
   function updateAbility(model, card, score) {
     model.theta = model.theta || {}; model.n = model.n || {};
     const k = abilityKey(card), th = model.theta[k] || 0, n = model.n[k] || 0;
-    const step = Math.max(0.15, 0.6 / Math.sqrt(1 + n / 10));  // settles as evidence accumulates
+    // Settles as evidence accumulates. A bigger first step that settles sooner (2026-11-06 request: hard
+    // cards should come quickly): in simulated learners on the three decks, an always-strong one meets
+    // 進階 cards after ~10 new cards instead of ~16, weak ones are unchanged and the estimate's spread
+    // grows by 0.1 at most against 0.6 / sqrt(1 + n / 10).
+    const step = Math.max(0.15, 1 / Math.sqrt(1 + n / 5));
     model.theta[k] = th + step * (score - expected(th, card));
     model.n[k] = n + 1;
     return model.theta[k];

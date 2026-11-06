@@ -59,6 +59,19 @@ const cards = [1, 2, 3].flatMap(l => Array.from({ length: 5 }, (_, i) => ({ id: 
 const pick = model => E.buildRound(cards, { progress: {}, model }, { now: 0, cap: 5, random: () => 0 }).fresh;
 ok("beginner gets basic cards", pick({}).every(c => c.level === 1));
 ok("strong learner gets harder cards", pick({ theta: { 5: 1.5 } }).every(c => c.level >= 2));
+// a learner who gets everything right climbs to advanced cards quickly (2026-11-06 request)
+{
+  const deck = [1, 2, 3].flatMap(l => Array.from({ length: 20 }, (_, i) => ({ id: `${l}-${i}`, ch: 5, level: l, format: "mc", choices: [1, 2, 3, 4] })));
+  const st = { progress: {}, model: {} };
+  let n = 0;
+  for (; n < 30; n++) {
+    const c = E.buildRound(deck, st, { now: 0, cap: 1, random: () => 0 }).fresh[0];
+    if (c.level === 3) break;
+    st.progress[c.id] = { box: 1, due: 9e15, log: [[0, 1, 1]] };
+    E.updateAbility(st.model, c, 1);
+  }
+  ok(`all right: first advanced card after ${n} new cards (at most 10)`, n <= 10);
+}
 const due = E.buildRound(cards, { progress: { "1-0": { due: 0 }, "1-1": { due: 9e15 } } }, { now: 1, cap: 0 });
 ok("only due seen cards return", due.seen.map(c => c.id).join() === "1-0");
 
