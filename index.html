@@ -367,12 +367,13 @@ const $ = id => document.getElementById(id);
 const D = () => DECKS[deckId];
 let renamed = {};  // old card id -> new (deck JSON), see Engine.applyRenames
 
-function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [], examLog: {} }; }
+// subFor: card id -> 1 while a card missed twice in a row is replaced by sibling cards when due (standIn)
+function blank() { return { progress: {}, mine: [], model: {}, settings: {}, essays: {}, ui: {}, rounds: {}, history: [], examLog: {}, subFor: {} }; }
 function load() {
   state = blank();
   try {
     const s = JSON.parse(localStorage.getItem(D().key) || "null");
-    if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [], rounds: s.rounds || {}, history: s.history || [] };
+    if (s && s.progress) state = { ...blank(), ...s, mine: s.mine || [], rounds: s.rounds || {}, history: s.history || [], subFor: s.subFor || {} };
     Engine.applyRenames(state, renamed);
   } catch (e) { /* storage blocked: practise without saving */ }
 }
@@ -464,12 +465,35 @@ function dueCount() {
 }
 function dayStart(t = Date.now()) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
 
-// A new round for the current selection. ids: only these cards (retrying the missed ones);
-// ignoreDue: the scheduled pace with every seen card, for a second round on the same day.
+// A missed card's stand-in (Engine.sibling): another card of the selection on the same idea, none of
+// the excluded ids. r.for records which card it stands for, so a right answer brings that card back
+// (state.subFor) and the ability counts it as fresh evidence. null: no sibling, the card itself again.
+function standIn(c, r, exclude) {
+  const orig = r.for[c.id] || c.id, base = byId(orig) || c;
+  const s = Engine.sibling(base, allCards().filter(inSelection), state.progress, [...exclude, orig]);
+  if (s) r.for[s.id] = orig;
+  return s;
+}
+
+// A new round for the current selection. ids: only these cards (retrying the missed ones), each
+// replaced by a stand-in when subs is set; ignoreDue: the scheduled pace with every seen card, for a
+// second round on the same day.
 function newRound(opts = {}) {
   const now = Date.now(), cards = allCards().filter(inSelection), pace = ui().pace;
   let list, review = 0, exam, label = selectionLabel();
-  if (opts.ids) list = opts.ids.map(byId).filter(Boolean);
+  // apart: stand-ins only from outside the list (a retry round's list is all missed cards). Otherwise a
+  // sibling already in the list may stand in where it is, so a marked card stays away even when every
+  // sibling was drawn into the round anyway.
+  const r = { for: {} }, swap = (cs, when, apart) => {
+    const used = apart ? cs.map(c => c.id) : [], out = [];
+    for (const c of cs) {
+      const s = when(c) && standIn(c, r, used);
+      if (s) used.push(s.id);
+      if (!s || !cs.includes(s)) out.push(s || c);
+    }
+    return out;
+  };
+  if (opts.ids) list = swap(opts.ids.map(byId).filter(Boolean), () => opts.subs, true);
   else if (pace === "exam") {
     const spec = exams.find(e => e.id === ui().exam) || exams[0];
     const b = spec ? Engine.buildExam(everyCard(), spec, Math.random, state.examLog[spec.id] || [], state.progress) : { ids: [], section: {}, short: [] };
@@ -484,11 +508,13 @@ function newRound(opts = {}) {
   else {
     state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
     const t = Engine.since(state.progress, dayStart()), limit = ack().limit || ui().dailyMax;
-    const r = Engine.planRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue, size: limit - t.n });
-    review = r.review;
-    list = r.list;
+    const p = Engine.planRound(cards, state, { now, cap: newCap(), ignoreDue: opts.ignoreDue, size: limit - t.n });
+    review = p.review;
+    // a card missed twice in a row stays away, a sibling in its place, until a sibling is answered right
+    list = swap(p.list, c => state.subFor[c.id]);
   }
-  return { pace, label, started: now, total: list.length, review, ids: list.map(c => c.id),
+  // extra: stand-ins queued during the round, outside its own cards (no result entry of their own)
+  return { pace, label, started: now, total: list.length, review, ids: list.map(c => c.id), for: r.for, extra: [],
            current: null, results: [], retried: [], done: false, retry: !!opts.ids, exam };
 }
 
@@ -781,7 +807,7 @@ function render() {
   const mine = phase !== "front" && typed.trim() && f !== "mc"
     ? `<div class="a"><div class="label">你的答案</div>${md(typed)}</div>` : "";
   card.innerHTML = `<div class="stamp right">答對</div><div class="stamp wrong">答錯</div><div class="body">
-    <div class="meta"><span>${esc(c.label || c.chapter)}</span>${c.type || KIND[c.kind] ? `<span>${esc(c.type || KIND[c.kind])}</span>` : ""}<span>${c.level ? Engine.LEVEL_NAME[c.level] + "・" : ""}${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
+    <div class="meta"><span>${esc(c.label || c.chapter)}</span>${c.type || KIND[c.kind] ? `<span>${esc(c.type || KIND[c.kind])}</span>` : ""}<span>${round && round.for && round.for[c.id] ? "替代題・" : ""}${c.level ? Engine.LEVEL_NAME[c.level] + "・" : ""}${p ? "第 " + p.box + " 盒" : "新卡"}</span></div>
     <div class="q">${md(c.q)}</div>
     ${mine}
     ${answerBody(c)}
@@ -930,14 +956,22 @@ function record(score) {
            phase: format(c) === "flip" ? "back" : "front", at: now };
   startUndoClock();
   const right = Engine.passed(c, score), s = Engine.schedule(p, right, now, sure);
+  if (round) { round.for = round.for || {}; round.extra = round.extra || []; }  // rounds saved before stand-ins
+  const orig = round && round.for[c.id];
+  // Missed twice in a row: from now on its siblings come when it is due, until one of them is answered
+  // right (2026-11-06 decision: it comes back first the next day to check, then siblings).
+  const prevWrong = p.log.length && !p.log[p.log.length - 1][1];
+  if (!orig && !right && prevWrong && !(round && round.exam)) state.subFor[c.id] = 1;
+  if (orig && right) delete state.subFor[orig];
   const f = format(c), entry = Engine.attempt(now, right, sure, score, f === "mc" ? picked : f === "num" ? typed : "");
   undo.shareId = queueShare(c, entry, !p.log.length);
   state.progress[c.id] = { chapter: c.chapter, ch: c.ch, kind: c.kind, level: c.level, box: s.box, due: s.due, log: [...p.log, entry] };
   // A retry of a missed card (later in its round, or in the 繼續複習答錯的 round) comes right after its
   // answer was shown: no evidence of ability, and counting it let wrong-then-right read almost as right,
-  // so harder cards came too early (2026-11-06 red-team review).
-  if (!(round && (round.retry || round.retried.includes(c.id)))) Engine.updateAbility(state.model, c, score);
-  if (round && !round.results.some(r => r.id === c.id)) {
+  // so harder cards came too early (2026-11-06 red-team review). A stand-in is a question not seen yet:
+  // it counts, while the card it stands for keeps its box (it was not answered).
+  if (!(round && (round.retried.includes(c.id) || (round.retry && !orig)))) Engine.updateAbility(state.model, c, score);
+  if (round && !round.extra.includes(c.id) && !round.results.some(r => r.id === c.id)) {
     const given = f === "mc" ? picked : f === "num" ? typed : "";
     round.results.push({ id: c.id, label: c.label || c.chapter, type: c.type || KIND[c.kind] || "", right, sure, score,
                          section: round.exam ? round.exam.section[c.id] : undefined,
@@ -946,7 +980,13 @@ function record(score) {
   }
   // Flip cards keep what was written too, when anything was (no rubric, so ticks stays empty).
   if (format(c) === "essay" || (format(c) === "flip" && typed.trim())) state.essays[c.id] = [...(state.essays[c.id] || []).slice(-2), { t: now, text: typed, ticks }];
-  if (round && !round.exam && !right && !round.retried.includes(c.id)) { round.retried.push(c.id); queue.splice(Engine.retryAt(queue.length, sure), 0, c); }
+  if (round && !round.exam && !right && !round.retried.includes(c.id)) {
+    round.retried.push(c.id);
+    const own = [...round.ids, ...queue.map(x => x.id), ...round.extra, ...round.results.map(x => x.id)];
+    const s = standIn(c, round, own);
+    if (s) round.extra.push(s.id);
+    queue.splice(Engine.retryAt(queue.length, sure), 0, s || c);
+  }
   save(); clearDraft();
   lastScore = score;
   if (round && round.exam) { current = null; return next(); }  // no answer shown until the paper is in
@@ -1046,7 +1086,8 @@ $("actions").addEventListener("click", e => {
   if (id === "score" && current) { const n = (current.points || []).length; record(Engine.grade(current, Array.from({ length: n }, (_, i) => !!ticks[i]))); }
   if (id === "next" && current) advance(Engine.passed(current, lastScore));
   if (id === "again") openRound({ ignoreDue: true });
-  if (id === "retryMissed" && round) openRound({ ids: Engine.summarize(round.results).missed });
+  // an exam's 檢討答錯的 goes over the paper's own questions; practice retries with stand-ins
+  if (id === "retryMissed" && round) openRound({ ids: Engine.summarize(round.results).missed, subs: !round.exam });
   if (id === "goOn" && paused) {
     const a = ack(), t = Engine.since(state.progress, dayStart());
     if (paused.code === "limit") a.limit = t.n + Engine.EXTRA; else a.at = t.attempts;
