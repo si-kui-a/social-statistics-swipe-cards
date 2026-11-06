@@ -117,6 +117,31 @@
   // misconception most worth fixing, after RETRY_SOON cards; an unsure one at the end.
   function retryAt(queueLength, sure) { return sure ? Math.min(RETRY_SOON, queueLength) : queueLength; }
 
+  // A different card on the same idea to stand in for a missed one (2026-11-06 request): the same question
+  // again right after its answer was shown tests memory of that answer, not the idea. Order: the same
+  // concept (card.concept, tagged by the course repository's cards.py) at another level or format, the
+  // same concept otherwise, then the same domain at the same level and format (decks without concepts,
+  // or a concept with no other card). Among equals the card answered longest ago, unseen first.
+  // pool: the cards allowed; exclude: ids not to use (the round's own cards). null: retry the card itself.
+  function sibling(card, pool, progress, exclude, random) {
+    const skip = new Set(exclude || []), rand = random || Math.random;
+    skip.add(card.id);
+    const fmt = c => (c.format === "truefalse" ? "mc" : c.format), lvl = level(card), f = fmt(card);
+    const tiers = [
+      c => card.concept && c.concept === card.concept && (level(c) !== lvl || fmt(c) !== f),
+      c => card.concept && c.concept === card.concept,
+      c => domainOf(c) === domainOf(card) && level(c) === lvl && fmt(c) === f,
+    ];
+    const last = c => { const l = (progress[c.id] || {}).log || []; return l.length ? l[l.length - 1][0] : -Infinity; };
+    for (const fits of tiers) {
+      const found = pool.filter(c => !skip.has(c.id) && fits(c));
+      if (!found.length) continue;
+      const oldest = Math.min(...found.map(last)), tied = found.filter(c => last(c) === oldest);
+      return tied[Math.floor(rand() * tied.length)];
+    }
+    return null;
+  }
+
   // Standing per domain (a card's label: a chapter or topic) over the whole history, in Khan Academy's
   // skill levels over the last LEVEL_WINDOW attempts: 未開始 (never answered), 嘗試 (under FAMILIAR
   // right), 熟悉, 精熟 (all right). Fewer than MIN_SAMPLE attempts is too little to call a domain weak
@@ -680,6 +705,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, sibling, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);

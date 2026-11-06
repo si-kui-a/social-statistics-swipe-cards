@@ -117,21 +117,57 @@
     if (table && table.getBoundingClientRect().right > W.innerWidth + 1) failures.push(`domain table overflows the screen (${Math.round(table.getBoundingClientRect().right)} > ${W.innerWidth})`);
     seen.push("stop/today counts cards, not retries");
     if (!new RegExp(`今天 ${total}/300 張`).test(D.getElementById("today").textContent)) failures.push(`today line: ${D.getElementById("today").textContent}`);
-    // A retry just after the answer was shown is no evidence of ability (2026-11-06): neither in the
-    // 繼續複習答錯的 round nor later in the round where the card was missed.
+    // A retry just after the answer was shown is no evidence of ability (2026-11-06): the same card again,
+    // in the 繼續複習答錯的 round or later in its own round, leaves the estimate alone. A missed card is
+    // retried through a stand-in (Engine.sibling) where one exists: an unseen question, so it counts,
+    // while the missed card keeps its box (decisions 2026-11-06).
     const abil = () => JSON.stringify(W.eval("state.model"));
-    seen.push("ability/retries are not evidence");
+    seen.push("retry/繼續複習答錯的 swaps in stand-ins");
+    const missedIds = W.eval("Engine.summarize(round.results).missed");
     D.getElementById("retryMissed").click();
+    const retryIds = W.eval("[current.id, ...queue.map(c => c.id)]");
+    if (retryIds.length !== missedIds.length) failures.push(`retry round holds ${retryIds.length} cards for ${missedIds.length} missed`);
+    const used = JSON.stringify([...missedIds, ...retryIds]);
+    for (const rid of retryIds) {
+      const stands = W.eval(`round.for[${JSON.stringify(rid)}] || null`), r = JSON.stringify(rid);
+      if (stands && (!missedIds.includes(stands) || missedIds.includes(rid))) failures.push(`retry card ${rid} stands for ${stands}, not a missed card`);
+      if (!stands && (!missedIds.includes(rid) || W.eval(`!!Engine.sibling(byId(${r}), allCards().filter(inSelection), state.progress, ${used})`)))
+        failures.push(`retry card ${rid}: the missed card itself although a sibling was free`);
+    }
+    seen.push("ability/retries are not evidence");
+    // the missed card itself (no sibling left) does not move the ability; a stand-in does
     let abilBefore = abil();
+    const isStandIn = W.eval("!!round.for[current.id]");
     W.eval("ans(true)");
-    if (abil() !== abilBefore) failures.push("a card in the 繼續複習答錯的 round moved the ability estimate");
+    if ((abil() !== abilBefore) !== isStandIn) failures.push(`a ${isStandIn ? "stand-in did not move" : "missed card again moved"} the ability estimate in the 繼續複習答錯的 round`);
     W.eval("localStorage.clear(); load();");
     pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
     W.eval("window.c0 = current; sure = 1; ans(false)");
     abilBefore = abil();
     if (abilBefore === "{}" || !W.eval("round.retried.includes(c0.id)")) failures.push("a confident miss was not counted or not queued for a retry");
+    seen.push("retry/same round queues a stand-in");
+    const sub = W.eval("(queue.find(c => round.for[c.id] === c0.id) || {}).id || null");
+    if (!sub || W.eval("queue.some(c => c.id === c0.id)")) failures.push("a miss later in its round came back as the same card, not a sibling");
+    const resultsBefore = W.eval("round.results.length");
+    W.eval(`current = queue.splice(queue.findIndex(c => c.id === ${JSON.stringify(sub)}), 1)[0]; ans(true)`);
+    if (abil() === abilBefore) failures.push("a stand-in answered right did not count toward the ability");
+    if (W.eval("round.results.length") !== resultsBefore) failures.push("a stand-in took a place in the round's score");
+    if (W.eval("state.progress[c0.id].box") !== 0) failures.push("a right stand-in promoted the missed card");
+    abilBefore = abil();
     W.eval("current = c0; ans(true)");
     if (abil() !== abilBefore) failures.push("a retry later in the same round moved the ability estimate");
+    // Due again and missed again: siblings come in its place until one is answered right.
+    seen.push("retry/missed twice is replaced when due");
+    W.eval("localStorage.clear(); load();");
+    pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
+    W.eval("window.c1 = current; state.progress[c1.id] = { box: 0, due: Date.now() - 1, log: [[Date.now() - 864e5, 0, 1]] }; sure = 1; ans(false)");
+    if (!W.eval("state.subFor[c1.id]")) failures.push("a card missed twice in a row was not marked for siblings");
+    W.eval("openRound({ ignoreDue: true }); if (!current) next()");
+    const due = W.eval("[current.id, ...queue.map(c => c.id)]");
+    const forC1 = due.find(i => W.eval(`round.for[${JSON.stringify(i)}]`) === W.eval("c1.id"));
+    if (due.includes(W.eval("c1.id")) || !forC1) failures.push("a card marked for siblings came back itself instead of a sibling");
+    W.eval(`current = byId(${JSON.stringify(forC1 || "")}) || current; ans(true)`);
+    if (W.eval("state.subFor[c1.id]")) failures.push("a right sibling did not bring the missed card back");
     W.eval("localStorage.clear(); load();");
     pick(`u => { u.pace = "all"; u.chapters = [${JSON.stringify(X)}, ${JSON.stringify(Y)}]; u.mix = true; u.dailyMax = 10; }`);
     for (let i = 0; i < 10; i++) W.eval("ans(true)");

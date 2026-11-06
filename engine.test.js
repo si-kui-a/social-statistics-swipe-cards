@@ -418,6 +418,25 @@ const swChecks = (async () => {
   ok("growth: no attempts, no points", E.growth({}).length === 0);
 }
 
+// sibling: a missed card's stand-in on the same idea (2026-11-06 decision)
+{
+  const m = (id, concept, level, format, label = "D2") => ({ id, concept, level, format, label });
+  const miss = m("x", "眾數", 1, "flip");
+  const pool = [miss, m("same", "眾數", 1, "flip"), m("harder", "眾數", 2, "flip"), m("other", "中位數", 1, "flip"),
+                m("otherHard", "中位數", 2, "flip"), m("far", "全距", 1, "flip", "D3")];
+  const first = (p, prog = {}, ex = []) => (E.sibling(miss, p, prog, ex, () => 0) || {}).id;
+  ok("sibling: same concept at another level first", first(pool) === "harder");
+  ok("sibling: same concept at the same level next", first(pool, {}, ["harder"]) === "same");
+  ok("sibling: then same label, same level and format", first(pool, {}, ["harder", "same"]) === "other");
+  ok("sibling: never another label or level outside the concept", first(pool, {}, ["harder", "same", "other"]) === undefined);
+  ok("sibling: never the card itself", first([miss]) === undefined);
+  ok("sibling: no concept falls back to the label", E.sibling(m("y", undefined, 1, "flip"), pool, {}, ["x"], () => 0).id === "same");
+  const seen = { harder: { log: [[5, 1]] } }, two = [miss, m("harder", "眾數", 2, "flip"), m("mc", "眾數", 1, "mc")];
+  ok("sibling: unseen before answered", first(two, seen) === "mc");
+  ok("sibling: answered longest ago among the seen", first(two, { ...seen, mc: { log: [[9, 1]] } }) === "harder");
+  ok("sibling: truefalse is the same format as mc", E.sibling(m("t", undefined, 1, "truefalse"), [m("k", undefined, 1, "mc")], {}, [], () => 0).id === "k");
+}
+
 console.log(`${fails} failed`);
 const tf = { format: "truefalse", answer: ["O"], choices: [["O", "正確"], ["X", "錯誤"]] };
 ok("truefalse: right pick", E.grade(tf, "O") === 1);
