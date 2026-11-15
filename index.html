@@ -217,8 +217,9 @@ table.t td.n, table.t th.n { text-align: right; }
   </header>
   <div class="modes">
     <div class="seg" id="pace" role="group" aria-label="每輪份量">
-      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button>
+      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button><button type="button" data-pace="sprint">考前衝刺</button>
     </div>
+    <button type="button" class="chip" id="openMemo">考前速記</button>
     <div class="seg" id="mix" role="group" aria-label="章節選法">
       <button type="button" data-mix="0">單章</button><button type="button" data-mix="1">多章混合</button>
     </div>
@@ -338,6 +339,7 @@ table.t td.n, table.t th.n { text-align: right; }
 </dialog>
 
 <div id="calc" class="calc" role="dialog" aria-label="計算機" hidden></div>
+<div id="memoSheet" class="calc" role="dialog" aria-label="考前速記" hidden></div>
 <script src="engine.js"></script>
 <script src="calc.js"></script>
 <script>
@@ -534,6 +536,12 @@ function newRound(opts = {}) {
     }
   }
   else if (pace === "all") list = Engine.fullPass(cards, state, { now });
+  else if (pace === "sprint") {
+    // the next exam's chapters whatever the chip says: cramming outside the exam's scope wastes the night
+    const today = new Date().toISOString().slice(0, 10), nextExam = scopes.filter(s => s.date >= today && s.ch).sort((a, b) => a.date < b.date ? -1 : 1)[0];
+    list = Engine.sprintList(nextExam ? allCards().filter(c => nextExam.ch.includes(c.ch)) : cards, state.progress, SPRINT_PRIORITY);
+    if (nextExam) label = `考前衝刺：${nextExam.title}（${nextExam.date}）`;
+  }
   else {
     state.settings = Engine.adjustVolume(state.settings, state.progress, dueCount(), D().newStart);
     const t = Engine.since(state.progress, dayStart()), limit = ack().limit || ui().dailyMax;
@@ -630,7 +638,7 @@ function renderProgress() {
     $("roundText").textContent = ex.grading ? `${ex.title}・批改簡答 ${done}/${total}` : `${ex.title}・${answered}/${total}・剩 ${mm}:${ss}`;
     $("barFill").style.width = `${total ? Math.round(100 * answered / total) : 0}%`;
   } else
-  $("roundText").textContent = total ? `本輪 ${done}/${total}・✓${right} ✗${done - right}` : "本輪沒有卡";
+  $("roundText").textContent = total ? `本輪 ${done}/${total}・✓${right} ✗${done - right}${round.pace === "sprint" && done ? `・答對率 ${Math.round(100 * right / done)}%（過關線 ${Engine.SPRINT_PASS * 100}%）` : ""}` : "本輪沒有卡";
   $("barFill").style.width = `${total ? Math.round(100 * done / total) : 0}%`;
   const t = Engine.since(state.progress, dayStart());
   $("today").textContent = `今天 ${t.n}/${ack().limit || ui().dailyMax} 張` + (t.n ? `・首答 ${t.pct}%` : "");
@@ -1154,6 +1162,9 @@ window.addEventListener("keydown", e => {
 
 // ---- Exam calculator (calc.js holds the logic): one fresh calculator per card, like a new exam question ----
 let calcState = null, calcFor = "";
+// Cram mode order: what the 11-10 quiz lost points on and what the teacher said is sure to be tested
+// (box plot first), then the rest of the first-half ideas.
+const SPRINT_PRIORITY = ["四分位距與箱形圖", "變異數與標準差", "平均數", "偏態", "集中趨勢量數選擇", "測量尺度", "比率與百分比", "中位數", "全距", "眾數", "線性轉換", "組距與組限"];
 const CALC_KEYS = [
   ["sq", "x²", "fn"], ["inv", "x⁻¹", "fn"], ["sqrt", "√", "fn"], ["log", "log", "fn"], ["pow", "xʸ", "fn"],
   ["7", "7"], ["8", "8"], ["9", "9"], ["DEL", "DEL", "fn"], ["AC", "AC", "fn"],
@@ -1192,6 +1203,14 @@ function fillFromCalc() {
   const box = $("numIn"); if (box) box.value = typed;
   closeCalc();
 }
+// One screen with every formula memo in the order of the cram list: read it before a sprint round.
+$("openMemo").addEventListener("click", () => {
+  const order = [...SPRINT_PRIORITY, ...Object.keys(memos).filter(k => !SPRINT_PRIORITY.includes(k))].filter(k => memos[k]);
+  const body = order.map(k => `<div class="memo"><div class="label">${esc(k)}</div><div><b>公式　</b>${md(memos[k].formula)}</div><div><b>怎麼記　</b>${md(memos[k].remember)}</div><div><b>按鍵　</b>${md(memos[k].keys)}</div></div>`).join("");
+  $("memoSheet").innerHTML = `<div class="calc-head"><span>考前速記：${order.length} 個公式（先看這裡，再按「考前衝刺」）</span><button type="button" data-close="1">收起</button></div>${body || "<p>這個題庫沒有公式速記。</p>"}`;
+  $("memoSheet").hidden = false;
+});
+$("memoSheet").addEventListener("click", e => { if (e.target.closest("[data-close]")) $("memoSheet").hidden = true; });
 $("calc").addEventListener("click", e => {
   const b = e.target.closest("button[data-k]"); if (!b) return;
   const k = b.dataset.k;

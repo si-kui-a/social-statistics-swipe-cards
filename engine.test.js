@@ -451,3 +451,13 @@ const moved = E.applyRenames({ progress: { a: { box: 3 }, keep: { box: 1 } }, es
 ok("rename: progress follows", moved.progress.b.box === 3 && !moved.progress.a && moved.essays.b[0] === "x");
 ok("rename: newer progress wins", E.applyRenames({ progress: { a: { box: 3 }, b: { box: 1 } } }, { a: "b" }).progress.b.box === 1);
 swChecks.then(() => process.exit(fails ? 1 : 0));
+
+// cram list: priority ideas first, missed before solid, no advanced or essay cards, capped
+{
+  const mk = (id, concept, level, extra = {}) => ({ id, concept, level, format: "num", num: { value: 1 }, ...extra });
+  const cards = [mk("a", "其他", 1), mk("b", "標準差", 2), mk("c", "標準差", 2), mk("d", "標準差", 3), mk("e", "標準差", 2, { format: "essay" }), mk("f", "箱形圖", 2)];
+  const progress = { b: { log: [[1, true]] }, c: { log: [[1, false]] } };
+  const ids = E.sprintList(cards, progress, ["箱形圖", "標準差"]).map(c => c.id).join("");
+  ok("sprint: priority idea first, missed before solid, advanced/essay out, rest last", ids === "fcba");
+  ok("sprint: capped", E.sprintList(Array.from({ length: 200 }, (_, i) => mk("x" + i, "標準差", 1)), {}, []).length === 60);
+}
