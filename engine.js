@@ -315,6 +315,19 @@
     return r.seen.concat(r.fresh, later);
   }
 
+  // Cram mode (考前衝刺): the shortest list that gets a pass. Only basic and standard cards (an advanced
+  // card does not move a pass mark), the ideas the exam is sure to test first (priority, in order), and
+  // inside an idea what is unseen or missed before what is solid, easy before hard. Capped so the list
+  // fits the evening; SPRINT_PASS is the line the round shows against the running score.
+  const SPRINT_PASS = 0.6, SPRINT_CAP = 60;
+  function sprintList(cards, progress, priority) {
+    const rank = c => { const i = priority.indexOf(c.concept); return i < 0 ? priority.length : i; };
+    const weak = c => { const p = progress[c.id], last = p && p.log && p.log[p.log.length - 1]; return !last ? 0 : last[1] ? 2 : 0.5; };
+    return cards.filter(c => level(c) <= 2 && c.format !== "essay")
+      .sort((a, b) => rank(a) - rank(b) || weak(a) - weak(b) || level(a) - level(b) || (a.id < b.id ? -1 : 1))
+      .slice(0, SPRINT_CAP);
+  }
+
   // A finished round in numbers. results hold the first attempt at each card ({ id, label, right, sure });
   // retries of missed cards do not count, as in Quizlet and Anki, so the score says what was known.
   // Results may also carry type (定義辨識, 國考選擇題…), diag (diagnose()) and trap (a misconception id);
@@ -705,6 +718,6 @@
   }
 
   const Engine = { examProgress, dangerStreak, DANGER_STREAK, EXPORT_VERSION, shareRow, shareDay, validateExport, attempt, LEVEL_NAME, TARGET, INTERVAL_DAYS, DAY, prob, expected, level, theta, updateAbility, keywordHit,
-                   matchPoints, parseNumber, grade, passed, schedule, retryAt, sibling, buildRound, planRound, recall, NEW_SHARE, fullPass, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
+                   matchPoints, parseNumber, grade, passed, schedule, retryAt, sibling, buildRound, planRound, recall, NEW_SHARE, fullPass, sprintList, SPRINT_PASS, buildExam, examLevel, applyRenames, examScore, effectiveLevel, EXAM_SKIP, EXAM_PASS, EXAM_DROP, domainStats, pickFresh, interleave, MIN_SAMPLE, summarize, since, growth, mastery, pauseReason, diagnose, DIAG, DAILY_MAX, EXTRA, RECENT_TODAY, recentScores, adjustVolume };
   if (typeof module === "object" && module.exports) module.exports = Engine; else root.Engine = Engine;
 })(typeof window === "undefined" ? globalThis : window);
