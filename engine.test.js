@@ -461,3 +461,14 @@ swChecks.then(() => process.exit(fails ? 1 : 0));
   ok("sprint: priority idea first, missed before solid, advanced/essay out, rest last", ids === "fcba");
   ok("sprint: capped", E.sprintList(Array.from({ length: 200 }, (_, i) => mk("x" + i, "標準差", 1)), {}, []).length === 60);
 }
+{
+  // The cram sheet draws one picture and shows one hook per formula concept; a concept without them would
+  // show up as a bare card the night before the exam.
+  const fs = require("fs"), page = fs.readFileSync(require("path").join(__dirname, "index.html"), "utf8");
+  const memos = JSON.parse(fs.readFileSync(require("path").join(__dirname, "cards.json"), "utf8")).memos || {};
+  const noArt = Object.keys(memos).filter(k => !page.includes(`  "${k}": \`<svg`));
+  ok("memo sheet: every formula concept has a picture" + (noArt.length ? ` (missing ${noArt.join(", ")})` : ""), noArt.length === 0);
+  const noHook = Object.keys(memos).filter(k => !(memos[k].hook || "").trim());
+  ok("memo sheet: every formula concept has a one-line hook" + (noHook.length ? ` (missing ${noHook.join(", ")})` : ""), noHook.length === 0);
+  ok("memo sheet: every picture belongs to a concept", [...page.matchAll(/^  "([^"]+)": `<svg/gm)].every(m => memos[m[1]]));
+}
