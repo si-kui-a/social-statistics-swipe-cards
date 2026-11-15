@@ -362,7 +362,13 @@ ok("export: v2 files still import", E.validateExport({ schemaVersion: 2, progres
 // service worker: pages and cards must be revalidated, or a phone keeps yesterday's engine.js from
 // the browser's HTTP cache even when online (2026-10-12: a new grading rule did not load)
 const sw = require("fs").readFileSync(require("path").join(__dirname, "sw.js"), "utf8");
-ok("sw: fresh files fetched with no-cache", /fetch\(event\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw));
+// every script the page loads must be in the offline file list, or the calculator vanishes offline
+{
+  const page = require("fs").readFileSync(require("path").join(__dirname, "index.html"), "utf8");
+  const srcs = [...page.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+  ok("sw: every page script is cached offline", srcs.length >= 2 && srcs.every(f => sw.includes(`"${f}"`)));
+}
+ok("sw: fresh files fetched with no-cache",/fetch\(event\.request,\s*\{\s*cache:\s*"no-cache"\s*\}\)/.test(sw));
 
 // sw: sites on this origin share one cache storage (another site runs this app through boot.js and imports
 // sw.js), so activating one site's worker deletes only that site's older caches, never the other's.

@@ -113,6 +113,30 @@ button.big { font: inherit; font-weight: 700; padding: 11px; border-radius: 12px
 button.big.sure { border-color: var(--accent); color: var(--accent); }
 button.big.right { border-color: var(--right); color: var(--right); }
 button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
+/* exam calculator: a bottom sheet over the page, keys laid out like a national-exam scientific calculator */
+.calc-open { font: inherit; font-size: .85rem; justify-self: start; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); cursor: pointer; }
+.calc { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0 auto; max-width: 480px; max-height: 94dvh; overflow-y: auto;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 14px 14px 0 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 28px rgb(0 0 0 / .18); display: grid; gap: 8px; user-select: none; }
+.calc[hidden] { display: none; }
+.calc-head { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; color: var(--muted); }
+.calc-head button { font: inherit; font-size: .8rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 2px 10px; cursor: pointer; }
+.calc-screen { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; min-height: 3.6rem; overflow: hidden; }
+.calc-top { font-size: .8rem; color: var(--muted); min-height: 1.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; }
+.calc-main { font-size: 1.6rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calc-main.err { color: var(--wrong); font-size: 1rem; }
+.calc-stat { font-size: .78rem; color: var(--muted); }
+.calc-tape { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; max-height: 4.2rem; overflow-y: auto; }
+.keys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.keys button { font: inherit; font-size: 1rem; min-height: 42px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; padding: 0; }
+.keys button:active { background: var(--tag); }
+.keys .fn { font-size: .85rem; color: var(--accent); background: var(--tag); }
+.keys .op { font-weight: 700; }
+.keys .eq { background: var(--accent); color: var(--card); border-color: var(--accent); font-weight: 700; }
+.keys .stat { font-size: .8rem; color: var(--right); }
+.calc-fill { font: inherit; font-weight: 700; padding: 10px; border-radius: 12px; border: 1px solid var(--right); background: var(--card); color: var(--right); cursor: pointer; }
+.memo { border-left: 3px solid var(--accent); padding-left: 10px; font-size: .92rem; display: grid; gap: 4px; }
+.memo .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
 button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 dialog { width: min(480px, 100vw); max-width: 100vw; max-height: 100dvh; margin: 0 auto; padding: 0; border: 0; border-radius: 0 0 14px 14px;
   background: var(--paper); color: var(--ink); }
@@ -313,7 +337,9 @@ table.t td.n, table.t th.n { text-align: right; }
   </div>
 </dialog>
 
+<div id="calc" class="calc" role="dialog" aria-label="計算機" hidden></div>
 <script src="engine.js"></script>
+<script src="calc.js"></script>
 <script>
 const KIND = { practice: "隨堂試試", reading: "讀懂別人的統計", quiz: "講義自我檢測", bank: "練習題", open: "開放教材", exam: "國考選擇題", tool: "軟體操作", mine: "自製" };
 // Only what the buttons and labels do not already say; the line also carries "answer first" prompts.
@@ -346,6 +372,9 @@ let paused = null;
 // Misconception types the course repository exports with the cards (cards.json "misconceptions"):
 // a pick tagged in card.traps is named in the round analysis with what to do about it.
 let misconceptions = {};
+// Per concept: formula, how to remember it and the key order on the calculator (cards.json "memos"),
+// shown under the answer of a calculation card.
+let memos = {};
 // Mock exams from the deck file (exams[]): fixed sections, a time limit, no feedback until the end.
 let exams = [], examTicker = null;
 // Fictional comments in a theorist's voice per group (deck file "voices"), shown with the exam progress.
@@ -642,9 +671,20 @@ function answerBody(c) {
 function workArea(c) {
   const f = format(c);
   if (phase !== "front" || f === "mc") return "";
-  if (f === "num") return `<div class="work"><label for="numIn">你的答案${c.num && c.num.unit ? `（${esc(c.num.unit)}）` : ""}</label><input type="text" id="numIn" inputmode="decimal" autocomplete="off" value="${esc(typed)}"></div>`;
+  const calcBtn = calcCard(c) ? `<button type="button" class="calc-open">開計算機</button>` : "";
+  if (f === "num") return `<div class="work"><label for="numIn">你的答案${c.num && c.num.unit ? `（${esc(c.num.unit)}）` : ""}</label><input type="text" id="numIn" inputmode="decimal" autocomplete="off" value="${esc(typed)}">${calcBtn}</div>`;
   const label = f === "essay" ? "你的答案（條列要點即可）" : "你的答案（選填，翻面後對照）";
-  return `<div class="work"><label for="essayIn">${label}</label><textarea id="essayIn"${f === "flip" ? ' class="optional"' : ""}>${esc(typed)}</textarea></div>`;
+  return `<div class="work"><label for="essayIn">${label}</label><textarea id="essayIn"${f === "flip" ? ' class="optional"' : ""}>${esc(typed)}</textarea>${calcBtn}</div>`;
+}
+
+// A card that asks for a calculation: a number answer, or a formula-application card. Those get the
+// on-screen calculator and, once answered, the concept's memo (formula, how to remember it, key order).
+function calcCard(c) { return !!c && (format(c) === "num" || (c.type === "公式應用" && !!memos[c.concept])); }
+function memoHtml(c) {
+  const m = calcCard(c) && memos[c.concept];
+  if (!m) return "";
+  const row = (label, t) => t ? `<div><b>${label}</b>${md(t)}</div>` : "";
+  return `<div class="memo"><div class="label">好記版：${esc(c.concept)}</div>${row("公式　", m.formula)}${row("怎麼記　", m.remember)}${row("按鍵　", m.keys)}</div>`;
 }
 
 // This round's problem points, all computed: weak chapters and question types, what kind of mistake
@@ -787,6 +827,7 @@ function summaryHtml(r) {
 function render() {
   const card = $("card");
   card.style.transform = ""; card.style.opacity = ""; card.style.transition = "";
+  if (!$("calc").hidden && (!current || current.id !== calcFor)) closeCalc();  // another card: a new calculator
   renderProgress();
   if (!current) {
     card.innerHTML = `<div class="body">${paused ? pauseHtml(round) : !deck.length
@@ -813,6 +854,7 @@ function render() {
     ${answerBody(c)}
     ${result}
     ${showAnswer && c.a ? `<div class="a"><div class="label">${f === "essay" ? "參考答案" : "答案與說明"}</div>${md(c.a)}</div>` : ""}
+    ${showAnswer ? memoHtml(c) : ""}
     ${showAnswer && c.kind !== "mine" ? `<a class="report" href="${esc(reportUrl(c))}" target="_blank" rel="noopener">回報這題有誤或有疑慮</a>` : ""}
     <p class="hint">${phase === "front" ? HINT[f] : ""}</p></div>${workArea(c)}`;
   setActions();
@@ -1069,6 +1111,7 @@ window.addEventListener("pointerup", e => {
 window.addEventListener("pointercancel", () => { if (drag) { drag = null; resetDrag(); } });
 
 $("card").addEventListener("click", e => {
+  if (e.target.closest(".calc-open")) return openCalc();
   const yes = e.target.closest("[data-share]");
   if (yes) { chooseShare(yes.dataset.share === "1"); return render(); }
   const b = e.target.closest(".choice");
@@ -1108,6 +1151,62 @@ window.addEventListener("keydown", e => {
   else if (phase === "back" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) record(e.key === "ArrowRight" ? 1 : 0);
   else if (phase === "result" && (e.key === "ArrowRight" || e.key === "Enter")) advance(Engine.passed(current, lastScore));
 });
+
+// ---- Exam calculator (calc.js holds the logic): one fresh calculator per card, like a new exam question ----
+let calcState = null, calcFor = "";
+const CALC_KEYS = [
+  ["sq", "x²", "fn"], ["inv", "x⁻¹", "fn"], ["sqrt", "√", "fn"], ["log", "log", "fn"], ["pow", "xʸ", "fn"],
+  ["7", "7"], ["8", "8"], ["9", "9"], ["DEL", "DEL", "fn"], ["AC", "AC", "fn"],
+  ["4", "4"], ["5", "5"], ["6", "6"], ["mul", "×", "op"], ["div", "÷", "op"],
+  ["1", "1"], ["2", "2"], ["3", "3"], ["add", "+", "op"], ["sub", "−", "op"],
+  ["0", "0"], [".", "."], ["lp", "("], ["rp", ")"], ["eq", "=", "eq"],
+  ["neg", "(−)", "fn"], ["ans", "Ans", "fn"], ["pi", "π", "fn"], ["mode", "MODE", "fn"],
+];
+const STAT_ROW = [["mean", "x̄"], ["sigma", "σn"], ["s", "sn-1"], ["n", "n"], ["sx", "Σx"], ["sx2", "Σx²"], ["DATA", "DATA"], ["DELDATA", "刪上筆"], ["CLRSTAT", "清統計"]];
+function openCalc() {
+  if (!current) return;
+  if (!calcState || calcFor !== current.id) { calcState = Calc.create(); calcFor = current.id; }
+  $("calc").hidden = false; drawCalc();
+}
+function closeCalc() { $("calc").hidden = true; }
+function drawCalc() {
+  const st = calcState, d = Calc.display(st), box = $("calc");
+  const stat = st.mode === "STAT";
+  const tape = st.tape.slice(-3).map(t => `<div>${esc(t.expr)} = ${esc(t.text)}</div>`).join("");
+  const keys = CALC_KEYS.map(([k, t, cls]) => `<button type="button" data-k="${k}" class="${cls || ""}">${esc(t)}</button>`).join("");
+  const statKeys = stat ? STAT_ROW.map(([k, t]) => `<button type="button" data-k="${k}" class="stat">${esc(t)}</button>`).join("") : "";
+  box.innerHTML = `<div class="calc-head"><span>計算機・${stat ? "統計模式（逐筆輸入再按 DATA）" : "一般計算"}</span><button type="button" data-k="close">收起</button></div>
+    <div class="calc-screen"><div class="calc-top">${esc(d.top)}</div><div class="calc-main${st.err ? " err" : ""}">${esc(d.main || (st.err ? "" : "0"))}</div></div>
+    ${stat ? `<div class="calc-stat">已輸入 ${st.data.length} 筆：${esc(st.data.slice(-8).map(Calc.fmt).join("、"))}${st.data.length > 8 ? "…" : ""}（先核對筆數 n）</div>` : ""}
+    ${tape ? `<div class="calc-tape">${tape}</div>` : ""}
+    ${stat ? `<div class="keys">${statKeys}</div>` : ""}
+    <div class="keys">${keys}</div>
+    ${current && format(current) === "num" ? `<button type="button" class="calc-fill" data-k="fill">把結果填入答案</button>` : ""}`;
+}
+// The value shown after = (or, before it, the expression so far evaluated), into the answer box.
+function fillFromCalc() {
+  const st = calcState; let v;
+  try { v = st.shown ? st.ans : Calc.value(st); } catch (e) { return; }
+  if (!Number.isFinite(v)) return;
+  typed = Calc.fmt(v); saveDraft();
+  const box = $("numIn"); if (box) box.value = typed;
+  closeCalc();
+}
+$("calc").addEventListener("click", e => {
+  const b = e.target.closest("button[data-k]"); if (!b) return;
+  const k = b.dataset.k;
+  if (k === "close") return closeCalc();
+  if (k === "fill") return fillFromCalc();
+  Calc.press(calcState, k); drawCalc();
+});
+const KEYMAP = { "+": "add", "-": "sub", "*": "mul", "/": "div", "(": "lp", ")": "rp", "^": "pow", Enter: "eq", "=": "eq", Backspace: "DEL", Escape: "AC", ".": "." };
+window.addEventListener("keydown", e => {
+  if ($("calc").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = /^[0-9]$/.test(e.key) ? e.key : KEYMAP[e.key];
+  if (!k) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  Calc.press(calcState, k); drawCalc();
+}, true);
 
 // Selection changes keep the round being left in state.rounds and open (or resume) the new one.
 function changeSelection(apply) { save(); apply(ui()); renderChips(); openRound(); }
@@ -1393,7 +1492,7 @@ async function openDeck(id) {
   try {
     const doc = await (await fetch(D().file, { cache: "no-cache" })).json();
     renamed = doc.renamed || {}; Engine.applyRenames(state, renamed);
-    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; exams = doc.exams || []; voices = doc.voices || {};
+    deck = doc.cards || []; scopes = doc.scopes || []; misconceptions = doc.misconceptions || {}; memos = doc.memos || {}; exams = doc.exams || []; voices = doc.voices || {};
     renderSources(doc.sources || []);
   } catch (e) { deck = []; scopes = []; voices = {}; renderSources([]); }
   const u = ui();
