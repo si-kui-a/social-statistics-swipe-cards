@@ -137,6 +137,35 @@ button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
 .calc-fill { font: inherit; font-weight: 700; padding: 10px; border-radius: 12px; border: 1px solid var(--right); background: var(--card); color: var(--right); cursor: pointer; }
 .memo { border-left: 3px solid var(--accent); padding-left: 10px; font-size: .92rem; display: grid; gap: 4px; }
 .memo .label { font-size: .78rem; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+/* 考前速記: one card per formula: concept, picture, the line to recite, formula lines, why, keys. */
+#memoSheet { gap: 10px; user-select: text; font-family: var(--font-body); }
+.mhead { position: sticky; top: 0; z-index: 1; background: var(--paper); display: grid; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.mbtns { display: flex; gap: 8px; }
+.mbtns button, .mjump button { font: inherit; font-size: .9rem; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; padding: 0 12px; }
+.mbtns .mgo { flex: 1; background: var(--accent); color: var(--card); border-color: var(--accent); font-weight: 700; }
+.mbtns [aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.mhint { font-size: .78rem; color: var(--muted); }
+.mjump { display: flex; flex-wrap: wrap; gap: 6px; }
+.mjump button { min-height: 36px; font-size: .82rem; padding: 0 10px; }
+.mcard { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 10px 12px; display: grid; gap: 6px; scroll-margin-top: 160px; }
+.mtitle { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+.mno { background: var(--ink); color: var(--card); border-radius: 999px; min-width: 1.6rem; height: 1.6rem; display: inline-grid; place-items: center; font-size: .8rem; }
+.mhook { font-size: 1.2rem; font-weight: 700; line-height: 1.4; border-left: 4px solid var(--accent); padding-left: 10px; }
+.mf { font-size: 1.02rem; line-height: 1.6; padding: 2px 8px; background: var(--tag); border-radius: 6px; margin-top: 4px; }
+.mwhy { font-size: .9rem; line-height: 1.6; color: var(--ink); margin-top: 4px; }
+.mcard details { font-size: .85rem; color: var(--muted); }
+.mcard summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.mart svg { width: 100%; height: auto; display: block; }
+.mart .l { stroke: var(--ink); fill: none; stroke-width: 1.5; }
+.mart .p { stroke: var(--ink); fill: var(--ink); }
+.mart .a { stroke: var(--accent); fill: var(--accent); }
+.mart .al { stroke: var(--accent); fill: none; stroke-width: 2.5; }
+.mart .d { stroke-dasharray: 4 3; }
+.mart .w { fill: var(--card); stroke: var(--ink); stroke-width: 1.5; }
+.mart text { fill: var(--ink); font-size: 11px; text-anchor: middle; }
+.mart .m { fill: var(--muted); }
+.mart text.tw { fill: var(--card); }
+.mtest .mcard:not(.open) .mhide { filter: blur(8px); cursor: pointer; }
 button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 dialog { width: min(480px, 100vw); max-width: 100vw; max-height: 100dvh; margin: 0 auto; padding: 0; border: 0; border-radius: 0 0 14px 14px;
   background: var(--paper); color: var(--ink); }
@@ -217,7 +246,7 @@ table.t td.n, table.t th.n { text-align: right; }
   </header>
   <div class="modes">
     <div class="seg" id="pace" role="group" aria-label="每輪份量">
-      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button><button type="button" data-pace="sprint">考前衝刺</button>
+      <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button>
     </div>
     <button type="button" class="chip" id="openMemo">考前速記</button>
     <div class="seg" id="mix" role="group" aria-label="章節選法">
@@ -596,6 +625,7 @@ function chipRow(el, items, isActive, attr) {
 function renderChips() {
   const cards = allCards(), u = ui();
   document.querySelectorAll("#pace button").forEach(b => b.setAttribute("aria-pressed", b.dataset.pace === u.pace));
+  $("openMemo").setAttribute("aria-pressed", u.pace === "sprint"); // the cram round is started from the memo sheet
   document.querySelectorAll("#mix button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mix === (u.mix ? "1" : "0")));
   $("mix").hidden = u.pace === "exam";
   if (u.pace === "exam") {  // the chapter row lists the exams instead; each exam fixes its own scope
@@ -1203,14 +1233,51 @@ function fillFromCalc() {
   const box = $("numIn"); if (box) box.value = typed;
   closeCalc();
 }
-// One screen with every formula memo in the order of the cram list: read it before a sprint round.
+// One small picture per formula concept (static markup, never built from data): what the formula measures.
+const MEMO_ART = {
+  "平均數": `<svg viewBox="0 0 300 90"><text x="150" y="14">蹺蹺板的支點＝平均數</text><line class="l" x1="20" y1="50" x2="280" y2="50"/><g class="p"><circle cx="50" cy="42" r="5"/><circle cx="90" cy="42" r="5"/><circle cx="110" cy="42" r="5"/><circle cx="200" cy="42" r="5"/><circle cx="250" cy="42" r="5"/></g><polygon class="a" points="140,52 130,68 150,68"/><text x="140" y="82">x̄</text></svg>`,
+  "中位數": `<svg viewBox="0 0 300 80"><g class="w"><rect x="25" y="20" width="40" height="30"/><rect x="75" y="20" width="40" height="30"/><rect x="175" y="20" width="40" height="30"/><rect x="225" y="20" width="40" height="30"/></g><rect class="a" x="125" y="20" width="40" height="30"/><g><text x="45" y="40">1</text><text x="95" y="40">3</text><text x="145" y="40" class="tw">5</text><text x="195" y="40">7</text><text x="245" y="40">9</text></g><text x="150" y="68" class="m">由小排到大，站正中那一個（雙數：中間兩個取平均）</text></svg>`,
+  "全距": `<svg viewBox="0 0 300 80"><path class="al" d="M30,30 V24 H270 V30"/><text x="150" y="16">全距</text><line class="l" x1="30" y1="44" x2="270" y2="44"/><g class="p"><circle cx="30" cy="44" r="5"/><circle cx="270" cy="44" r="5"/></g><g class="m"><circle cx="90" cy="44" r="3"/><circle cx="130" cy="44" r="3"/><circle cx="190" cy="44" r="3"/></g><text x="30" y="68">最小</text><text x="270" y="68">最大</text></svg>`,
+  "四分位距與箱形圖": `<svg viewBox="0 0 300 96"><line class="l d" x1="24" y1="22" x2="24" y2="58"/><line class="l d" x1="250" y1="22" x2="250" y2="58"/><text x="24" y="14" class="m">下籬笆</text><text x="250" y="14" class="m">上籬笆</text><line class="l" x1="40" y1="40" x2="225" y2="40"/><line class="l" x1="40" y1="33" x2="40" y2="47"/><line class="l" x1="225" y1="33" x2="225" y2="47"/><rect class="w" x="100" y="26" width="60" height="28"/><line class="al" x1="130" y1="26" x2="130" y2="54"/><circle class="p" cx="275" cy="40" r="4"/><text x="275" y="30">特異值</text><text x="40" y="70">最小</text><text x="100" y="70">Q1</text><text x="130" y="70">中位</text><text x="160" y="70">Q3</text><text x="225" y="70">最大</text><text x="150" y="94" class="m">箱長 IQR；籬笆＝箱邊往外 1.5 個箱長</text></svg>`,
+  "變異數與標準差": `<svg viewBox="0 0 300 100"><line class="l d" x1="152" y1="8" x2="152" y2="72"/><g class="p"><circle cx="50" cy="16" r="4"/><circle cx="90" cy="28" r="4"/><circle cx="150" cy="40" r="4"/><circle cx="210" cy="52" r="4"/><circle cx="260" cy="64" r="4"/></g><g class="l"><line x1="50" y1="16" x2="152" y2="16"/><line x1="90" y1="28" x2="152" y2="28"/><line x1="152" y1="52" x2="210" y2="52"/><line x1="152" y1="64" x2="260" y2="64"/></g><text x="152" y="84" class="m">平均</text><text x="150" y="97">離平均多遠 → 平方 → 平均 → 開根號</text></svg>`,
+  "比率與百分比": `<svg viewBox="0 0 300 84"><path class="al" d="M30,26 V20 H270 V26"/><text x="150" y="14">全部（分母）</text><rect class="w" x="30" y="30" width="240" height="26"/><rect class="a" x="30" y="30" width="90" height="26"/><text x="75" y="74">部分（分子）</text></svg>`,
+  "組距與組限": `<svg viewBox="0 0 300 84"><path class="al" d="M30,28 V22 H90 V28"/><text x="60" y="15">組距</text><rect class="w" x="30" y="32" width="240" height="24"/><g class="l"><line x1="90" y1="32" x2="90" y2="56"/><line x1="150" y1="32" x2="150" y2="56"/><line x1="210" y1="32" x2="210" y2="56"/></g><text x="30" y="72">最小</text><text x="270" y="72">最大</text><text x="150" y="72" class="m">(最大−最小) ÷ 組數</text></svg>`,
+  "累積次數": `<svg viewBox="0 0 300 96"><g class="w"><rect x="40" y="62" width="44" height="8"/><rect x="100" y="50" width="44" height="20"/><rect x="160" y="30" width="44" height="40"/></g><rect class="a" x="220" y="14" width="44" height="56"/><g><text x="62" y="58">4</text><text x="122" y="46">10</text><text x="182" y="26">20</text><text x="242" y="10">28</text></g><text x="150" y="88" class="m">每格＝前面全部加起來；單組＝本組−上一組</text></svg>`,
+  "Z 分數": `<svg viewBox="0 0 300 100"><path class="l" d="M20,70 C80,70 100,12 150,12 C200,12 220,70 280,70"/><line class="l d" x1="150" y1="12" x2="150" y2="70"/><line class="al" x1="150" y1="70" x2="190" y2="70"/><text x="170" y="62">1 個標準差</text><text x="150" y="84">平均</text><text x="205" y="84">Z＝+1</text><text x="150" y="98" class="m">Z＝(X−平均)÷標準差：幾個標準差遠</text></svg>`,
+  "常態分配與機率": `<svg viewBox="0 0 300 100"><path class="a" d="M211,41 C230,55.5 250,70 280,70 L211,70 Z"/><path class="l" d="M20,70 C80,70 100,12 150,12 C200,12 220,70 280,70"/><line class="l d" x1="150" y1="12" x2="150" y2="70"/><text x="211" y="84">Z</text><text x="250" y="52">以上</text><text x="150" y="98" class="m">表給「以下」；要「以上」＝1 −（以下）</text></svg>`,
+  "估計量與抽樣分配": `<svg viewBox="0 0 300 96"><path class="l d" d="M30,76 C80,76 100,30 150,30 C200,30 220,76 270,76"/><path class="al" d="M105,76 C128,76 135,10 150,10 C165,10 172,76 195,76"/><text x="52" y="62">n（寬）</text><text x="150" y="90">人數 ×4（4n）→ 標準誤 σ÷√n 變一半</text></svg>`,
+  "信賴區間": `<svg viewBox="0 0 300 84"><line class="al" x1="40" y1="40" x2="260" y2="40"/><line class="l" x1="40" y1="30" x2="40" y2="50"/><line class="l" x1="260" y1="30" x2="260" y2="50"/><circle class="p" cx="150" cy="40" r="5"/><text x="150" y="28">x̄</text><text x="95" y="62">− 1.96 × SE</text><text x="205" y="62">+ 1.96 × SE</text><text x="150" y="80" class="m">中心點 ± 1.96 個標準誤（95%）</text></svg>`,
+  "線性轉換": `<svg viewBox="0 0 300 100"><g class="p"><circle cx="40" cy="20" r="4"/><circle cx="70" cy="20" r="4"/><circle cx="110" cy="20" r="4"/></g><g class="a"><circle cx="140" cy="56" r="4"/><circle cx="170" cy="56" r="4"/><circle cx="210" cy="56" r="4"/></g><line class="al" x1="115" y1="26" x2="140" y2="46"/><text x="215" y="24" class="m">原來</text><text x="250" y="60">+ b</text><text x="150" y="86">加減 b：整排搬家，間距不變</text><text x="150" y="98" class="m">乘 a：間距放大 |a| 倍</text></svg>`,
+};
+function memoCard(k, i) {
+  const m = memos[k], lines = String(m.formula).split("；").map(t => `<div class="mf">${md(t)}</div>`).join("");
+  return `<section class="mcard" id="memo-${i}"><div class="mtitle"><span class="mno">${i + 1}</span>${esc(k)}</div>`
+    + (MEMO_ART[k] ? `<div class="mart" aria-hidden="true">${MEMO_ART[k]}</div>` : "")
+    + `<div class="mhide"><div class="mhook">${esc(m.hook || "")}</div>${lines}<div class="mwhy">${md(m.remember)}</div></div>`
+    + `<details><summary>計算機按鍵</summary>${md(m.keys)}</details></section>`;
+}
+// The cram sheet: every formula as a card in the order of the cram list (picture, one line to recite,
+// formula lines, why), a cover-up self-test, and the button that starts the cram round, which no longer
+// has a place in the crowded pace row.
 $("openMemo").addEventListener("click", () => {
   const order = [...SPRINT_PRIORITY, ...Object.keys(memos).filter(k => !SPRINT_PRIORITY.includes(k))].filter(k => memos[k]);
-  const body = order.map(k => `<div class="memo"><div class="label">${esc(k)}</div><div><b>公式　</b>${md(memos[k].formula)}</div><div><b>怎麼記　</b>${md(memos[k].remember)}</div><div><b>按鍵　</b>${md(memos[k].keys)}</div></div>`).join("");
-  $("memoSheet").innerHTML = `<div class="calc-head"><span>考前速記：${order.length} 個公式（先看這裡，再按「考前衝刺」）</span><button type="button" data-close="1">收起</button></div>${body || "<p>這個題庫沒有公式速記。</p>"}`;
+  const jump = order.map((k, i) => `<button type="button" data-jump="${i}">${i + 1} ${esc(k)}</button>`).join("");
+  $("memoSheet").classList.remove("mtest");
+  $("memoSheet").innerHTML = `<div class="mhead"><div class="calc-head"><span>考前速記：${order.length} 個公式</span><button type="button" data-close="1">收起</button></div>`
+    + `<div class="mbtns"><button type="button" class="mgo" data-go="1">▶ 開始考前衝刺（至多 60 題，過關線 60%）</button><button type="button" data-cover="1" aria-pressed="false">蓋住自測</button></div>`
+    + `<div class="mhint">順序：先看圖與口訣，再按「蓋住自測」看圖回想，點卡片翻開對答案，最後開始衝刺。</div></div>`
+    + (order.length ? `<div class="mjump">${jump}</div>${order.map(memoCard).join("")}` : "<p>這個題庫沒有公式速記。</p>");
   $("memoSheet").hidden = false;
+  $("memoSheet").scrollTop = 0;
 });
-$("memoSheet").addEventListener("click", e => { if (e.target.closest("[data-close]")) $("memoSheet").hidden = true; });
+$("memoSheet").addEventListener("click", e => {
+  const sheet = $("memoSheet"), t = e.target;
+  if (t.closest("[data-close]")) sheet.hidden = true;
+  else if (t.closest("[data-go]")) { sheet.hidden = true; changeSelection(u => { u.pace = "sprint"; }); }
+  else if (t.closest("[data-cover]")) { const b = t.closest("[data-cover]"), on = !sheet.classList.contains("mtest"); sheet.classList.toggle("mtest", on); b.setAttribute("aria-pressed", on); sheet.querySelectorAll(".mcard.open").forEach(c => c.classList.remove("open")); }
+  else if (t.closest("[data-jump]")) $("memo-" + t.closest("[data-jump]").dataset.jump).scrollIntoView({ block: "start", behavior: "smooth" });
+  else if (t.closest(".mcard") && !t.closest("details") && sheet.classList.contains("mtest")) t.closest(".mcard").classList.toggle("open");
+});
 $("calc").addEventListener("click", e => {
   const b = e.target.closest("button[data-k]"); if (!b) return;
   const k = b.dataset.k;

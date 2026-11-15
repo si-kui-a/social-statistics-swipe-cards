@@ -3,7 +3,7 @@
 // new cards appear when online, and fall back to the cached copy when offline.
 // Another site that runs this app through boot.js sets SITE_CACHE and SITE_FILES and imports this file,
 // so both sites share one offline logic (see README "給其他網站共用").
-const CACHE = self.SITE_CACHE || "swipe-cards-v17";
+const CACHE = self.SITE_CACHE || "swipe-cards-v18";
 // Sites on the same origin share one cache storage: delete only this site's older versions, never another's
 const OWN = CACHE.replace(/\d+$/, "");
 // scholar portraits shown with the exam progress (engine.test.js checks this list against img/)
