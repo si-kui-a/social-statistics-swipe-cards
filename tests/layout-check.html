@@ -142,17 +142,24 @@
     if ((abil() !== abilBefore) !== isStandIn) failures.push(`a ${isStandIn ? "stand-in did not move" : "missed card again moved"} the ability estimate in the 繼續複習答錯的 round`);
     W.eval("localStorage.clear(); load();");
     pick(`u => { u.pace = "sched"; u.mix = false; u.chapters = [${JSON.stringify(X)}]; u.dailyMax = 300; }`);
-    W.eval("window.c0 = current; sure = 1; ans(false)");
+    // The round starts on a random card, and a card whose concept, level and format nobody else in the
+    // chapter shares has no sibling (the app then repeats it, by design), so the sibling is required only
+    // when Engine.sibling finds one for this start; otherwise the card itself must come back.
+    W.eval("window.c0 = current; window.hasSib = !!Engine.sibling(c0, allCards().filter(inSelection), state.progress, [...round.ids, ...queue.map(x => x.id), ...round.extra, ...round.results.map(x => x.id)]); sure = 1; ans(false)");
     abilBefore = abil();
     if (abilBefore === "{}" || !W.eval("round.retried.includes(c0.id)")) failures.push("a confident miss was not counted or not queued for a retry");
     seen.push("retry/same round queues a stand-in");
     const sub = W.eval("(queue.find(c => round.for[c.id] === c0.id) || {}).id || null");
-    if (!sub || W.eval("queue.some(c => c.id === c0.id)")) failures.push("a miss later in its round came back as the same card, not a sibling");
+    const hasSib = W.eval("hasSib");
+    if (hasSib && (!sub || W.eval("queue.some(c => c.id === c0.id)"))) failures.push("a miss later in its round came back as the same card, not a sibling");
+    if (!hasSib && !W.eval("queue.some(c => c.id === c0.id)")) failures.push("a miss with no sibling did not come back as itself");
     const resultsBefore = W.eval("round.results.length");
-    W.eval(`current = queue.splice(queue.findIndex(c => c.id === ${JSON.stringify(sub)}), 1)[0]; ans(true)`);
-    if (abil() === abilBefore) failures.push("a stand-in answered right did not count toward the ability");
-    if (W.eval("round.results.length") !== resultsBefore) failures.push("a stand-in took a place in the round's score");
-    if (W.eval("state.progress[c0.id].box") !== 0) failures.push("a right stand-in promoted the missed card");
+    if (sub) {
+      W.eval(`current = queue.splice(queue.findIndex(c => c.id === ${JSON.stringify(sub)}), 1)[0]; ans(true)`);
+      if (abil() === abilBefore) failures.push("a stand-in answered right did not count toward the ability");
+      if (W.eval("round.results.length") !== resultsBefore) failures.push("a stand-in took a place in the round's score");
+      if (W.eval("state.progress[c0.id].box") !== 0) failures.push("a right stand-in promoted the missed card");
+    }
     abilBefore = abil();
     W.eval("current = c0; ans(true)");
     if (abil() !== abilBefore) failures.push("a retry later in the same round moved the ability estimate");
