@@ -151,7 +151,15 @@ button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
 .mtitle { font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
 .mno { background: var(--ink); color: var(--card); border-radius: 999px; min-width: 1.6rem; height: 1.6rem; display: inline-grid; place-items: center; font-size: .8rem; }
 .mhook { font-size: 1.2rem; font-weight: 700; line-height: 1.4; border-left: 4px solid var(--accent); padding-left: 10px; }
-.mf { font-size: 1.02rem; line-height: 1.6; padding: 2px 8px; background: var(--tag); border-radius: 6px; margin-top: 4px; }
+.mf { font-size: 1.02rem; line-height: 1.7; padding: 6px 10px; background: var(--tag); border-radius: 8px; margin-top: 6px; }
+.mcard .mhook { font-family: var(--font-display); }
+.mcard .mf.kv { display: grid; gap: 2px; }
+.mcard .mk { font-weight: 700; font-size: .85rem; color: var(--ink); border-bottom: 2px solid var(--accent); justify-self: start; line-height: 1.5; }
+.mcard .msec { margin-top: 10px; font-size: .85rem; font-weight: 700; letter-spacing: .04em; border-top: 1px solid var(--line); padding-top: 8px; }
+.mcard .msw { display: grid; gap: 2px; font-size: .95rem; line-height: 1.65; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px; }
+.mcard .msw .x { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--muted); }
+.mcard .msw .x::before { content: "✗ 考卷句　"; text-decoration: none; display: inline-block; font-weight: 700; color: var(--wrong); }
+.mcard .msw .y::before { content: "✓ 判斷　"; display: inline-block; font-weight: 700; color: var(--right); }
 .mwhy { font-size: .9rem; line-height: 1.6; color: var(--ink); margin-top: 4px; }
 .mcard details { font-size: .85rem; color: var(--muted); }
 .mcard summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
@@ -1292,12 +1300,15 @@ async function loadCram() {
   return cram;
 }
 function cramCard(c, i) {
-  const list = (t, a) => a && a.length ? `<div class="mwhy"><b>${t}</b></div>` + a.map(x => `<div class="mf">${md(x)}</div>`).join("") : "";
+  // a line "label：text" shows the label as a small heading so the eye can scan the card
+  const line = t => { const m = /^([^：]{1,8})：(.+)$/.exec(t); return m ? `<div class="mf kv"><span class="mk">${esc(m[1])}</span><span>${md(m[2])}</span></div>` : `<div class="mf">${md(t)}</div>`; };
+  const swap = t => { const m = /^(.+?)\s*→\s*(.+)$/.exec(t); return m ? `<div class="msw"><span class="x">${md(m[1])}</span><span class="y">${md(m[2].replace(/^錯：/, ""))}</span></div>` : `<div class="msw">${md(t)}</div>`; };
+  const sec = (t, a, f) => a && a.length ? `<div class="msec">${t}</div>` + a.map(f).join("") : "";
   return `<section class="mcard" id="memo-${i}"><div class="mtitle"><span class="mno">${i + 1}</span>${esc(c.title)}<span class="msrc">${esc(c.src)}</span></div>`
     + (CRAM_ART[c.art] ? `<div class="mart" aria-hidden="true">${CRAM_ART[c.art]}</div>` : "")
-    + `<div class="mhide"><div class="mhook">${esc(c.hook)}</div>${c.lines.map(t => `<div class="mf">${md(t)}</div>`).join("")}<div class="mwhy">${md(c.why)}</div>`
-    + list("易混", c.pairs) + list("考卷常換的句子", c.swaps) + `</div>`
-    + `<details><summary>申論骨架</summary>${c.skel.map(x => `<div>${md(x)}</div>`).join("")}</details></section>`;
+    + `<div class="mhide"><div class="mhook">${esc(c.hook)}</div>${c.lines.map(line).join("")}<div class="mwhy">${md(c.why)}</div>`
+    + sec("容易混淆", c.pairs, line) + sec("考卷常換的句子", c.swaps, swap) + `</div>`
+    + `<details><summary>申論骨架（點開）</summary>${c.skel.map(x => `<div class="mf">${md(x)}</div>`).join("")}</details></section>`;
 }
 async function openCramSheet(cards, title) {
   let last = "";
