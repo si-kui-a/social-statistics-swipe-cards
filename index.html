@@ -165,6 +165,8 @@ button.big.wrong { border-color: var(--wrong); color: var(--wrong); }
 .mart text { fill: var(--ink); font-size: 11px; text-anchor: middle; }
 .mart .m { fill: var(--muted); }
 .mart text.tw { fill: var(--card); }
+.msrc { margin-left: auto; font-size: .72rem; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.mgroup { margin: 8px 0 0; font-size: .95rem; color: var(--accent); }
 .mtest .mcard:not(.open) .mhide { filter: blur(8px); cursor: pointer; }
 button:focus-visible, .chip:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 dialog { width: min(480px, 100vw); max-width: 100vw; max-height: 100dvh; margin: 0 auto; padding: 0; border: 0; border-radius: 0 0 14px 14px;
@@ -1259,7 +1261,42 @@ function memoCard(k, i) {
 // The cram sheet: every formula as a card in the order of the cram list (picture, one line to recite,
 // formula lines, why), a cover-up self-test, and the button that starts the cram round, which no longer
 // has a place in the crowded pace row.
-$("openMemo").addEventListener("click", () => {
+// Theory and research decks have no formulas: their cram cards (cram.json, loaded on first use) are one scholar
+// concept or method choice each, with the basis ("AI 推論" or "題庫解說") shown on every card.
+const CRAM_ART = {
+  suicide: `<svg viewBox="0 0 300 120"><line class="l" x1="150" y1="22" x2="150" y2="98"/><line class="l" x1="50" y1="60" x2="250" y2="60"/><text x="150" y="14" class="m">規範太強</text><text x="150" y="112" class="m">規範太弱</text><text x="150" y="30" class="a" style="stroke:none">宿命型</text><text x="150" y="92" class="a" style="stroke:none">脫序型</text><text x="26" y="56" class="m">整合</text><text x="26" y="68" class="m">太弱</text><text x="274" y="56" class="m">整合</text><text x="274" y="68" class="m">太強</text><text x="88" y="52">利己型</text><text x="212" y="52">利他型</text></svg>`,
+  tree: `<svg viewBox="0 0 300 120"><text x="150" y="12">依變項是什麼？</text><line class="l" x1="150" y1="18" x2="60" y2="36"/><line class="l" x1="150" y1="18" x2="240" y2="36"/><text x="60" y="48">類別</text><text x="240" y="48">連續（平均數）</text><text x="60" y="66" class="a" style="stroke:none">卡方</text><line class="l" x1="240" y1="54" x2="170" y2="72"/><line class="l" x1="240" y1="54" x2="270" y2="72"/><text x="170" y="84">2 組</text><text x="270" y="84">3 組以上 → ANOVA</text><text x="170" y="100" class="m">獨立 T／成對 T</text><text x="150" y="116" class="m">連續對連續：相關、迴歸</text></svg>`,
+};
+let cram = null;
+async function loadCram() {
+  if (cram) return cram;
+  try { cram = (await (await fetch("cram.json", { cache: "no-cache" })).json()).decks || {}; } catch (e) { cram = {}; }
+  return cram;
+}
+function cramCard(c, i) {
+  const list = (t, a) => a && a.length ? `<div class="mwhy"><b>${t}</b></div>` + a.map(x => `<div class="mf">${md(x)}</div>`).join("") : "";
+  return `<section class="mcard" id="memo-${i}"><div class="mtitle"><span class="mno">${i + 1}</span>${esc(c.title)}<span class="msrc">${esc(c.src)}</span></div>`
+    + (CRAM_ART[c.art] ? `<div class="mart" aria-hidden="true">${CRAM_ART[c.art]}</div>` : "")
+    + `<div class="mhide"><div class="mhook">${esc(c.hook)}</div>${c.lines.map(t => `<div class="mf">${md(t)}</div>`).join("")}<div class="mwhy">${md(c.why)}</div>`
+    + list("易混", c.pairs) + list("考卷常換的句子", c.swaps) + `</div>`
+    + `<details><summary>申論骨架</summary>${c.skel.map(x => `<div>${md(x)}</div>`).join("")}</details></section>`;
+}
+async function openCramSheet(cards, title) {
+  let last = "";
+  const jump = cards.map((c, i) => `<button type="button" data-jump="${i}">${i + 1} ${esc(c.title)}</button>`).join("");
+  const body = cards.map((c, i) => { const g = c.group !== last ? `<h3 class="mgroup">${esc(c.group)}</h3>` : ""; last = c.group; return g + cramCard(c, i); }).join("");
+  $("memoSheet").classList.remove("mtest");
+  $("memoSheet").innerHTML = `<div class="mhead"><div class="calc-head"><span>考前速記：${esc(title)} ${cards.length} 張</span><button type="button" data-close="1">收起</button></div>`
+    + `<div class="mbtns"><button type="button" class="mgo" data-go="1">▶ 開始考前衝刺（至多 60 題，過關線 60%）</button><button type="button" data-cover="1" aria-pressed="false">蓋住自測</button></div>`
+    + `<div class="mhint">標「AI 推論」的卡是依現有題庫與考卷樣本預測的，不是老師公布的範圍。</div></div><div class="mjump">${jump}</div>${body}`;
+  $("memoSheet").hidden = false;
+  $("memoSheet").scrollTop = 0;
+}
+$("openMemo").addEventListener("click", async () => {
+  if (!Object.keys(memos).length) {
+    const c = ((await loadCram())[deckId] || {}).cards;
+    if (c && c.length) return openCramSheet(c, D().title);
+  }
   const order = [...SPRINT_PRIORITY, ...Object.keys(memos).filter(k => !SPRINT_PRIORITY.includes(k))].filter(k => memos[k]);
   const jump = order.map((k, i) => `<button type="button" data-jump="${i}">${i + 1} ${esc(k)}</button>`).join("");
   $("memoSheet").classList.remove("mtest");
