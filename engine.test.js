@@ -476,7 +476,7 @@ swChecks.then(() => process.exit(fails ? 1 : 0));
   const cram = JSON.parse(fs.readFileSync(require("path").join(__dirname, "cram.json"), "utf8")).decks;
   const all = Object.values(cram).flatMap(d => d.cards);
   ok("cram sheet: theory and research decks both have cards", !!cram.theory && !!cram.research && cram.theory.cards.length > 0 && cram.research.cards.length > 0);
-  ok("cram sheet: every card names its basis", all.every(c => c.src === "AI 推論" || c.src === "題庫解說"));
+  ok("cram sheet: every card names its basis", all.every(c => ["AI 推論", "題庫解說", "助教導讀"].includes(c.src)));
   ok("cram sheet: every card has a hook, swaps and a skeleton", all.every(c => c.hook && c.swaps.length && c.skel.length));
   ok("cram sheet: every picture key exists in the page", all.every(c => !c.art || page.includes(`  ${c.art}: \`<svg`)));
   ok("cram sheet: cram.json is cached offline", /"cram\.json"/.test(fs.readFileSync(require("path").join(__dirname, "sw.js"), "utf8")));
