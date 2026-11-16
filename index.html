@@ -46,7 +46,7 @@ body {
   color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.7;
 }
 .wrap { max-width: 480px; height: 100vh; height: 100dvh; margin: 0 auto; display: grid; gap: 8px;
-  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 header { display: flex; gap: 8px; align-items: center; }
@@ -57,6 +57,18 @@ header .seg { flex: 1; }
 header .seg button { font-size: .95rem; padding: 6px; }
 .menu-btn { font: inherit; font-size: 1.1rem; width: 40px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
 .modes { display: flex; gap: 8px; }
+.modes .seg { flex: 1; }
+/* The scope and chapter rows live in one closed panel that opens over the card, so the card never moves down
+   and no chip row is cut off at the screen edge. The summary line shows what is picked. */
+.filter { position: relative; }
+.filter > summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  padding: 4px 12px; font-size: .85rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter > summary::-webkit-details-marker { display: none; }
+.filter > summary::after { content: " ▾"; color: var(--muted); }
+.filter[open] > summary::after { content: " ▴"; }
+.filter-body { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; display: grid; gap: 8px; padding: 10px;
+  max-height: 55dvh; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.filter-body .chips { flex-wrap: wrap; overflow: visible; }
 /* One swipeable row each: wrapped, the long chapter names filled a phone screen and pushed the card below it. */
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
@@ -259,12 +271,17 @@ table.t td.n, table.t th.n { text-align: right; }
       <button type="button" data-pace="sched">排程複習</button><button type="button" data-pace="all">全部刷完</button><button type="button" data-pace="exam">模擬考</button>
     </div>
     <button type="button" class="chip" id="openMemo">考前速記</button>
-    <div class="seg" id="mix" role="group" aria-label="章節選法">
-      <button type="button" data-mix="0">單章</button><button type="button" data-mix="1">多章混合</button>
-    </div>
   </div>
-  <div class="chips" id="scopes" role="group" aria-label="選擇考試範圍或大類"></div>
-  <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
+  <details class="filter" id="filter">
+    <summary id="filterSum">範圍：全部</summary>
+    <div class="filter-body">
+      <div class="seg" id="mix" role="group" aria-label="章節選法">
+        <button type="button" data-mix="0">單章</button><button type="button" data-mix="1">多章混合</button>
+      </div>
+      <div class="chips" id="scopes" role="group" aria-label="選擇考試範圍或大類"></div>
+      <div class="chips" id="chips" role="group" aria-label="選擇章節"></div>
+    </div>
+  </details>
   <div class="progress" aria-live="polite">
     <span id="roundText"></span><span class="bar"><i id="barFill" style="width:0"></i></span><span id="today"></span>
     <button class="undo" id="undo" type="button" hidden>↶ 反悔</button>
@@ -662,6 +679,9 @@ function renderChips() {
     ...chapters.map(([k, l]) => [k, short(l), inG.filter(c => c.chapter === k).length])],
     k => k === "all" ? !u.chapters.length : u.chapters.includes(k), "ch");
   }
+  const picked = [...document.querySelectorAll("#scopes .chip[aria-pressed=true], #chips .chip[aria-pressed=true]")]
+    .map(b => b.textContent.replace(/ · \d+$/, ""));
+  $("filterSum").textContent = "範圍：" + (picked.join("．") || "全部");
   const all = [...new Map(cards.map(c => [c.chapter, c.label])).entries()].sort();
   $("addChapter").innerHTML = all.map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join("");
 }
